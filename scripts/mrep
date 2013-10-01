@@ -1,0 +1,195 @@
+#
+# build Replicant on MacOS X / Darwin
+#
+# tested and debugged on OS X 10.6.8 with Xcode 3.2.6 (gcc 4.2)
+#
+# usage: mrep [ -s ] { -d | -k | -r | -n | -p }
+#
+
+[ "$REPLICANT" ] || export REPLICANT=2.3
+[ "$DESTDIR" ] || export DESTDIR=$PWD/unstable
+
+#
+# please manually create a very large case sensitive working disk image (each replicant version eats 20-25 GB):
+# hdiutil create -type SPARSEBUNDLE -fs 'Case-sensitive Journaled HFS+' -size 50g -volname Replicant replicant.sparsebundle
+# mount as /Volumes/Replicant
+#
+
+THIS=$PWD
+
+# protect against copying/storing ._ files
+export COPY_EXTENDED_ATTRIBUTES_DISABLED=true
+# for 10.5
+export COPYFILE_DISABLE=true
+
+cd /Volumes/Replicant
+
+if [ ! -x tools/repo ]
+then
+	echo "*** fetching the repo tool ***"
+	mkdir -p tools
+	[ -x "$(which wget)" ] && wget -O - https://dl-ssl.google.com/dl/googlesource/git-repo/repo > tools/repo || curl https://dl-ssl.google.com/dl/googlesource/git-repo/repo > tools/repo
+	chmod a+x tools/repo
+fi
+
+if [ -x replicant-$REPLICANT ]
+then
+	echo "*** switching to replicant-$REPLICANT ***"
+	cd replicant-$REPLICANT/
+else
+	echo "*** initializing to replicant-$REPLICANT ***"
+	mkdir -p replicant-$REPLICANT
+	cd replicant-$REPLICANT/
+	../tools/repo init -u git://gitorious.org/replicant/manifest.git -b replicant-$REPLICANT
+fi
+
+if [ "$1" = "-s" ]
+then # sync and apply all patches
+	shift
+	echo "*** syncing replicant-$REPLICANT ***"
+	../tools/repo sync
+
+	( cd $THIS/src/replicant/$REPLICANT && find . -name '*.patch' -print ) | while read PATCH
+		do
+		DIR=$(dirname "$PATCH")
+		echo "*** patching $PATCH in $DIR ***"
+		( cd $DIR && pwd && git am -3 $THIS/src/replicant/$REPLICANT/$PATCH ) || exit 1
+		done
+fi
+
+echo "*** envsetup ***"
+
+source build/envsetup.sh
+
+if [ "$(uname)" == "Darwin" ]
+then
+	echo "*** preparing Darwin compilers ***"
+	# this has been developed and tested on Mac OS X 10.6.8 (HOSTCC specific libraries and tools) with Xcode 3.2.6 (gcc/llvm-gcc-4.2)
+	if [ ! -r out/host/darwin-x86/include/elf.h ]
+	then
+		echo "*** getting elf.h ***"
+		mkdir -p out/host/darwin-x86/bin out/host/darwin-x86/include
+		curl 'http://sourceware.org/git/?p=glibc.git;a=blob_plain;f=elf/elf.h&hb=HEAD' > out/host/darwin-x86/include/elf.h
+		sed -i.bak 's|#include <features.h>|// #include <features.h>|g' out/host/darwin-x86/include/elf.h
+		sed -i.bak 's|__BEGIN_DECLS|// __BEGIN_DECLS|g' out/host/darwin-x86/include/elf.h
+		sed -i.bak 's|__END_DECLS|// __END_DECLS|g' out/host/darwin-x86/include/elf.h
+#		cp $THIS/src/replicant/$REPLICANT/elf.h out/host/darwin-x86/include/elf.h
+	fi
+	case "$REPLICANT" in
+	2.3 )
+		# for Replicant-2.3 we need standard gcc (not llvm-gcc) and have to explicitly add libstdc++ to avoid some errors
+		# g++ compilation needs libstdc++; this will print a harmless warning for standard C (e.g. when building the kernel)
+		cat >out/host/darwin-x86/bin/gcc <<END
+# echo /usr/bin/gcc-4.2 -I/Volumes/Replicant/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter /Volumes/Replicant/replicant-2.3/kernel/goldelico/gta04/include '-DACCESSPERMS=(S_IRWXU|S_IRWXG|S_IRWXO)' \$@ -lSystem -lstdc++
+/usr/bin/gcc-4.2 -I/Volumes/Replicant/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter /Volumes/Replicant/replicant-2.3/kernel/goldelico/gta04/include '-DACCESSPERMS=(S_IRWXU|S_IRWXG|S_IRWXO)' \$@ -lSystem -lstdc++
+END
+		chmod +x out/host/darwin-x86/bin/gcc
+		ln -sf gcc out/host/darwin-x86/bin/cc
+		ln -sf gcc out/host/darwin-x86/bin/g++
+		;;
+	4.0 )
+		# for Replicant-4.0 we need llvm-gcc or we will run into a compiler/assembler bug
+		# and we need to include some Linux header files to compile the tools
+		cat >out/host/darwin-x86/bin/gcc <<END
+/usr/bin/llvm-gcc-4.2 -I/Volumes/Replicant/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__ASSEMBLY__ \$@
+END
+		chmod +x out/host/darwin-x86/bin/gcc
+		ln -sf gcc out/host/darwin-x86/bin/cc
+		;;
+	* )
+		echo "*** don't know how to compile Replicant-$REPLICANT ***"
+		exit 1
+	esac
+	echo gcc: $(cat out/host/darwin-x86/bin/gcc)
+	# we need a find that understands -printf from MacPorts
+	if [ ! -x /opt/local/bin/gfind ]
+	then
+		echo "*** sudo port install coreutils findutils gsed ***"
+		# sudo port install coreutils findutils gsed
+	fi
+	ln -sf /opt/local/bin/gfind out/host/darwin-x86/bin/find
+	ln -sf /opt/local/bin/gstat out/host/darwin-x86/bin/stat
+	ln -sf /opt/local/bin/greadlink out/host/darwin-x86/bin/readlink
+	ln -sf /opt/local/bin/gsed out/host/darwin-x86/bin/sed
+	ln -sf "$(which gnutar)" out/host/darwin-x86/bin/tar
+
+	if [ ! -r out/host/darwin-x86/bin/mkimage ]
+	then
+		curl http://download.goldelico.com/gta04/unstable/scripts/darwin/mkimage > out/host/darwin-x86/bin/mkimage
+		chmod a+x out/host/darwin-x86/bin/mkimage
+	fi
+	PATH=$PWD/out/host/darwin-x86/bin:$PATH
+fi
+
+echo "*** lunch replicant_gta04-eng ***"
+
+lunch replicant_gta04-eng
+export ANDROID_JAVA_HOME=$JAVA_HOME
+
+COMMANDS="$@"
+[ "$COMMANDS" ] || COMMANDS="-k -r -n -p"
+
+echo "*** run $COMMANDS ***"
+
+for i in $COMMANDS
+do
+	case "$i" in
+	-d )
+		echo "*** -d show build commands ***"
+		SHOWCOMMANDS=showcommands
+		;;
+	-k )
+		echo "*** -k make kernel ***"
+
+		# make bootloaderimage	# we need mkimage before building the kernel
+		make $SHOWCOMMANDS bootimage BOARD_SDCARD_INIT:=true || exit 1
+		echo "*** copy to $DESTDIR/kernel ***"
+		cp out/target/product/gta04/kernel "$DESTDIR/kernel"
+		;;
+	-r )
+		echo "*** -r make rootfs ***"
+
+		make $SHOWCOMMANDS systemtarball || exit 1
+
+		echo "*** copy to $DESTDIR/system.tar.bz2 ***"
+		cp out/target/product/gta04/system.tar.bz2 "$DESTDIR/system.tar.bz2"
+		chmod a+r "$DESTDIR/system.tar.bz2"
+		;;
+	-n )
+		echo "*** -n create $DESTDIR/rootfs.tar.bz2 without initramdisk ***"
+		(
+		cd out/target/product/gta04 && 
+		rm -rf rootfs/boot rootfs/sbin/init &&
+		mkdir -p rootfs/boot &&
+		ln -s system/lib rootfs/lib &&
+		# make a flat file system
+		(cd root && tar cf - .) | (cd rootfs && tar xf -) &&
+		(tar cf - system recovery kernel) | (cd rootfs && tar xf -) &&
+		sed -i.bak 's/mount /#mount /g' rootfs/init.rc && rm rootfs/init.rc.bak &&
+		sed -i.bak 's/mount /#mount /g' rootfs/init.gta04.rc && rm rootfs/init.gta04.rc.bak &&
+		sed -i.bak 's/on fs/#on fs/g' rootfs/init.rc && rm rootfs/init.rc.bak && # /init segfaults if there are no commands in 'on fs'
+		sed -i.bak 's/on fs/#on fs/g' rootfs/init.gta04.rc && rm rootfs/init.gta04.rc.bak && # /init segfaults if there are no commands in 'on fs'
+		ln -sf ../kernel rootfs/boot/uImage &&
+		ln -sf ../init rootfs/sbin/init &&
+		tar cjvf rootfs.tar.bz2 -C rootfs .
+		) &&
+		cp out/target/product/gta04/rootfs.tar.bz2 "$DESTDIR/rootfs.tar.bz2"
+		chmod a+r "$DESTDIR/rootfs.tar.bz2"
+		;;
+	-p )
+		echo "*** -p save patches and scripts ***"
+
+		rm -rf "$DESTDIR/patches" "$DESTDIR/scripts"
+		mkdir -p "$DESTDIR/patches" "$DESTDIR/scripts"
+		(cd $THIS/src/replicant/$REPLICANT && tar czf - --exclude .svn --exclude .DS_Store .) | (cd "$DESTDIR/patches" && tar xvzf -)
+		cp $THIS/mrep /Volumes/Replicant/replicant-$REPLICANT/out/host/darwin-x86/include/elf.h "$DESTDIR/scripts/"
+		;;
+	* )
+		echo "*** unknown command $i ignored ***"
+		;;
+	esac
+done
+
+echo "*** result ***"
+
+ls -l "$DESTDIR"
