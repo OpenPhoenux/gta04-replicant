@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+    <manifest>
+        <remote name="local-git" fetch="file:///home/lukas/git" />
+        <remove-project name="replicant/kernel_goldelico_gta04" />
+        <remove-project name="replicant/device_goldelico_gta04" />
+        <remove-project name="replicant/vendor_replicant" />
+        <project path="kernel/goldelico/gta04" name="linux" remote="local-git" revision="android-3.0-gta04"/>
+        <project path="device/goldelico/gta04" name="replicant_device_gta04" remote="local-git" revision="replicant-4.0-goldelico"/>
+        <project path="vendor/replicant" name="replicant_vendor_replicant" remote="local-git" revision="vendor-replicant-4.0-goldelico"/>
+        <!-- GOLDELICO
+        <remote name="goldelico" fetch="http://git.goldelico.com/" />
+        <remove-project name="replicant/kernel_goldelico_gta04" />
+        <remove-project name="replicant/device_goldelico_gta04" />
+        <remove-project name="replicant/vendor_replicant" />
+        <project path="kernel/goldelico/gta04" name="gta04-kernel.git" remote="goldelico" revision="3.0-wip-android-gta04"/>
+        <project path="device/goldelico/gta04" name="gta04-replicant.git" remote="goldelico" revision="replicant-4.0-goldelico"/>
+        <project path="vendor/replicant" name="gta04-replicant.git" remote="goldelico" revision="vendor-replicant-4.0-goldelico"/>
+        /GOLDELICO -->
+    </manifest>
