@@ -28,9 +28,10 @@ if [ ! -x tools/repo ]
 then
 	echo "*** fetching the repo tool ***"
 	mkdir -p tools
+	REPO="https://dl-ssl.google.com/dl/googlesource/git-repo/repo"
 	[ -x "$(which wget)" ] &&
-		wget -O - "https://dl-ssl.google.com/dl/googlesource/git-repo/repo" > tools/repo ||
-		curl "https://dl-ssl.google.com/dl/googlesource/git-repo/repo" > tools/repo
+		wget -O - $REPO > tools/repo ||
+		curl $REPO > tools/repo
 	chmod a+x tools/repo
 fi
 
@@ -52,9 +53,10 @@ then # sync and apply all patches
 	then
 		echo "*** syncing local manifest ***"
 		mkdir -p .repo/local_manifests
+		MANIFEST="http://git.goldelico.com/?p=gta04-replicant.git;a=blob_plain;f=local_manifests/gta04-replicant-$REPLICANT.xml;hb=refs/heads/master"
 		[ -x "$(which wget)" ] &&
-			wget -O - "http://git.goldelico.com/?p=gta04-replicant.git;a=blob_plain;f=local_manifests/gta04.xml;hb=refs/heads/master" > .repo/local_manifests/gta04.xml ||
-			curl "http://git.goldelico.com/?p=gta04-replicant.git;a=blob_plain;f=local_manifests/gta04.xml;hb=refs/heads/master" > .repo/local_manifests/gta04.xml
+			wget -O - $MANIFEST > .repo/local_manifests/gta04.xml ||
+			curl $MANIFEST > .repo/local_manifests/gta04.xml
 	fi
 
 	echo "*** syncing replicant-$REPLICANT ***"
