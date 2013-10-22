@@ -52,8 +52,8 @@ then
 	mkdir -p .repo/local_manifests
 	MANIFEST="http://git.goldelico.com/?p=gta04-replicant.git;a=blob_plain;f=local_manifests/gta04-replicant-$REPLICANT.xml;hb=refs/heads/master"
 	[ -x "$(which wget)" ] &&
-		wget -O - $MANIFEST > .repo/local_manifests/gta04.xml ||
-		curl $MANIFEST > .repo/local_manifests/gta04.xml
+		wget -O - $MANIFEST > .repo/local_manifests/gta04-replicant-$REPLICANT.xml ||
+		curl $MANIFEST > .repo/local_manifests/gta04-replicant-$REPLICANT.xml
 fi
 
 if [ "$1" = "-s" ]
@@ -143,10 +143,10 @@ export ANDROID_JAVA_HOME=$JAVA_HOME
 COMMANDS="$@"
 case "$REPLICANT" in
 	2.3 )
-		[ "$COMMANDS" ] || COMMANDS="-k -r -n"
+		[ "$COMMANDS" ] || COMMANDS="-r -k -n"
 		;;
 	4.0 )
-		[ "$COMMANDS" ] || COMMANDS="-b"
+		[ "$COMMANDS" ] || COMMANDS="-r -b"
 		;;
 esac
 
@@ -155,12 +155,28 @@ echo "*** run $COMMANDS ***"
 for i in $COMMANDS
 do
 	case "$i" in
+	-c )
+		echo "*** -c make clean ***"
+
+		make clean
+
+		;;
 	-d )
 		echo "*** -d show build commands ***"
 		SHOWCOMMANDS=showcommands
 		;;
+	-r )
+		echo "*** -r make rootfs ***"
+
+		make bootimage BOARD_SDCARD_INIT:=true
+		make $SHOWCOMMANDS systemtarball || exit 1
+
+		echo "*** copy to $DESTDIR/system.tar.bz2 ***"
+		cp "out/target/product/gta04/system.tar.bz2" "$DESTDIR/system.tar.bz2"
+		chmod a+r "$DESTDIR/system.tar.bz2"
+		;;
 	-k )
-		echo "*** -k make kernel ***"
+		echo "*** -k make kernel (only) ***"
 
 		# check if we have 'mkimage'
 		# make bootloaderimage	# we need mkimage before building the kernel
@@ -173,22 +189,13 @@ do
 		cp out/target/product/gta04/kernel "$DESTDIR/kernel"
 		;;
 	-b )
-		echo "*** -b build single partition rootfs ***"
+		echo "*** -b create single partition rootfs $DESTDIR/gta04-rootfs.tar.gz ***"
 
-		"$THIS/src/gta04-replicant/scripts/mkrootfs.sh"
+		./goldelico/scripts/mkrootfs.sh
 
 		echo "*** copy to $DESTDIR/gta04-rootfs.tar.bz2 ***"
-		cp "out/target/product/gta04/gta04-rootfs.tar.gz" "$DESTDIR/gta04-rootfs.tar.gz"
-		chmod a+r "$DESTDIR/gta04-rootfs.tar.gz"
-		;;
-	-r )
-		echo "*** -r make rootfs ***"
-
-		make $SHOWCOMMANDS systemtarball || exit 1
-
-		echo "*** copy to $DESTDIR/system.tar.bz2 ***"
-		cp "out/target/product/gta04/system.tar.bz2" "$DESTDIR/system.tar.bz2"
-		chmod a+r "$DESTDIR/system.tar.bz2"
+		cp "out/target/product/gta04/gta04-rootfs.tar.bz2" "$DESTDIR/gta04-rootfs.tar.bz2"
+		chmod a+r "$DESTDIR/gta04-rootfs.tar.bz2"
 		;;
 	-n )
 		echo "*** -n create $DESTDIR/rootfs.tar.bz2 without initramdisk ***"
@@ -213,7 +220,8 @@ do
 		;;
 	* )
 		echo "*** unknown command $i ignored ***"
-		echo "-s sync everything"
+		echo "-s sync everything (must be first option)"
+		echo "-c make clean (can't combine with others in same command)"
 		echo "-d show build commands"
 		echo "-k build kernel"
 		echo "-b build single-partition gta04-rootfs (4.0)"
