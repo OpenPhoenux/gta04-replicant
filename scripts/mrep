@@ -3,7 +3,7 @@
 #
 # tested and debugged on OS X 10.6.8 with Xcode 3.2.6 (gcc 4.2)
 #
-# usage: mrep [ -s ] { -d | -k | -b | -r | -n }
+# usage: mrep { -s | -l | -r | -c } { -d | -k | -b | -f | -n }
 #
 
 [ "$REPLICANT" ] || export REPLICANT=2.3
@@ -56,20 +56,47 @@ then
 		curl $MANIFEST > .repo/local_manifests/gta04-replicant-$REPLICANT.xml
 fi
 
-if [ "$1" = "-s" ]
-then # sync and apply all patches
-	shift
+while true
+do
+	case "$1" in
+	-c )
+		shift
+		echo "*** -c make clean ***"
 
-	echo "*** syncing replicant-$REPLICANT ***"
-	../tools/repo sync
+		make clean
 
-	( cd $THIS/src/replicant/$REPLICANT && find . -name '*.patch' -print ) | while read PATCH
-		do
-		DIR=$(dirname "$PATCH")
-		echo "*** patching $PATCH in $DIR ***"
-		( cd $DIR && pwd && git am -3 $THIS/src/replicant/$REPLICANT/$PATCH ) || exit 1
-		done
-fi
+		;;
+	-s )
+		# sync and apply all patches
+		shift
+
+		echo "*** syncing replicant-$REPLICANT ***"
+		../tools/repo sync
+
+		( cd $THIS/src/replicant/$REPLICANT && find . -name '*.patch' -print ) | while read PATCH
+			do
+			DIR=$(dirname "$PATCH")
+			echo "*** patching $PATCH in $DIR ***"
+			( cd $DIR && pwd && git am -3 $THIS/src/replicant/$REPLICANT/$PATCH ) || exit 1
+			done
+		;;
+	-r )
+		shift
+		
+		echo "*** using git.goldelico.com ***"
+		mv .repo/local_manifests/z.xml .repo/local_manifests/z.xml.txt	# disable local
+		;;
+	-l )
+		shift
+
+		echo "*** using localhost ***"
+		mv .repo/local_manifests/z.xml.txt .repo/local_manifests/z.xml	# enable local
+		;;
+	* )
+		break
+		;;
+	esac
+done
 
 echo "*** envsetup ***"
 
@@ -143,10 +170,10 @@ export ANDROID_JAVA_HOME=$JAVA_HOME
 COMMANDS="$@"
 case "$REPLICANT" in
 	2.3 )
-		[ "$COMMANDS" ] || COMMANDS="-r -k -n"
+		[ "$COMMANDS" ] || COMMANDS="-f -k -n"
 		;;
 	4.0 )
-		[ "$COMMANDS" ] || COMMANDS="-r -b"
+		[ "$COMMANDS" ] || COMMANDS="-f -b"
 		;;
 esac
 
@@ -155,17 +182,11 @@ echo "*** run $COMMANDS ***"
 for i in $COMMANDS
 do
 	case "$i" in
-	-c )
-		echo "*** -c make clean ***"
-
-		make clean
-
-		;;
 	-d )
 		echo "*** -d show build commands ***"
 		SHOWCOMMANDS=showcommands
 		;;
-	-r )
+	-f )
 		echo "*** -r make rootfs ***"
 
 		make bootimage BOARD_SDCARD_INIT:=true
@@ -220,12 +241,16 @@ do
 		;;
 	* )
 		echo "*** unknown command $i ignored ***"
+		echo "before sync & initialization"
 		echo "-s sync everything (must be first option)"
 		echo "-c make clean (can't combine with others in same command)"
+		echo "-l use local git files (from file://localhost/...)"
+		echo "-r use remote git files (from git.goldelico.com)"
+		echo "after sync & initialization"
 		echo "-d show build commands"
 		echo "-k build kernel"
 		echo "-b build single-partition gta04-rootfs (4.0)"
-		echo "-r build system (2.3)"
+		echo "-f build system (2.3)"
 		echo "-n patch system to single-partition rootfs"
 		;;
 	esac
