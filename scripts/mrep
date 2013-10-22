@@ -84,13 +84,13 @@ do
 		shift
 		
 		echo "*** using git.goldelico.com ***"
-		mv .repo/local_manifests/z.xml .repo/local_manifests/z.xml.txt	# disable local
+		rm -f .repo/local_manifests/z.xml	# disable localhost git
 		;;
 	-l )
 		shift
 
 		echo "*** using localhost ***"
-		mv .repo/local_manifests/z.xml.txt .repo/local_manifests/z.xml	# enable local
+		cp $THIS/src/gta04-replicant/local_manifests/z.xml .repo/local_manifests/z.xml	# enable localhost git
 		;;
 	* )
 		break
@@ -192,9 +192,6 @@ do
 		make bootimage BOARD_SDCARD_INIT:=true
 		make $SHOWCOMMANDS systemtarball || exit 1
 
-		echo "*** copy to $DESTDIR/system.tar.bz2 ***"
-		cp "out/target/product/gta04/system.tar.bz2" "$DESTDIR/system.tar.bz2"
-		chmod a+r "$DESTDIR/system.tar.bz2"
 		;;
 	-k )
 		echo "*** -k make kernel (only) ***"
@@ -219,6 +216,10 @@ do
 		chmod a+r "$DESTDIR/gta04-rootfs.tar.bz2"
 		;;
 	-n )
+		echo "*** copy to $DESTDIR/system.tar.bz2 ***"
+		cp "out/target/product/gta04/system.tar.bz2" "$DESTDIR/system.tar.bz2"
+		chmod a+r "$DESTDIR/system.tar.bz2"
+
 		echo "*** -n create $DESTDIR/rootfs.tar.bz2 without initramdisk ***"
 		(
 		cd out/target/product/gta04 && 
