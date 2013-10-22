@@ -1,26 +1,29 @@
 #!/bin/bash
 echo "*** preparing GTA04 rootfs ***"
-cd out/target/product/gta04/
+cd out/target/product/gta04/ || exit 1
 mkdir -p rootfs/boot
 
 echo "*** copying system ***"
 cp -a system rootfs/
+
 echo "*** copying root ***"
 cp -a root/* rootfs/
+
 echo "*** copying recovery ***"
 cp -a recovery rootfs/
+
 echo "*** copying kernel ***"
 cp kernel rootfs/boot/uImage
-cd rootfs/sbin/
+(
+cd rootfs/sbin/ &&
 ln -s ../init init
-cd ../..
+)
 
 echo "*** generating GTA04 rootfs ***"
-cd rootfs/
-tar czvf ../gta04-rootfs.tar.gz .
-cd ..
+cd rootfs/ &&
+tar cjvf ../gta04-rootfs.tar.bz2 .
 
 echo "*** cleaning up GTA04 rootfs ***"
 rm -rf rootfs/
 echo "Result is here:"
-echo "out/target/product/gta04/gta04-rootfs.tar.gz"
+echo "out/target/product/gta04/gta04-rootfs.tar.bz2"
