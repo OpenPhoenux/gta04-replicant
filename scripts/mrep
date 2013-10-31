@@ -3,7 +3,7 @@
 #
 # tested and debugged on OS X 10.6.8 with Xcode 3.2.6 (gcc 4.2)
 #
-# usage: mrep { -s | -l | -r | -c } { -d | -k | -b | -f | -n }
+# usage: mrep { -s | -u | -l | -r | -c } { -d | -k | -b | -f | -n }
 #
 
 [ "$REPLICANT" ] || export REPLICANT=2.3
@@ -52,8 +52,8 @@ then
 	mkdir -p .repo/local_manifests
 	MANIFEST="http://git.goldelico.com/?p=gta04-replicant.git;a=blob_plain;f=local_manifests/gta04-replicant-$REPLICANT.xml;hb=refs/heads/master"
 	[ -x "$(which wget)" ] &&
-		wget -O - $MANIFEST > .repo/local_manifests/gta04-replicant-$REPLICANT.xml ||
-		curl $MANIFEST > .repo/local_manifests/gta04-replicant-$REPLICANT.xml
+		wget -O - $MANIFEST > .repo/local_manifests/gta04.xml ||
+		curl $MANIFEST > .repo/local_manifests/gta04.xml
 fi
 
 while true
@@ -64,6 +64,14 @@ do
 		echo "*** -c make clean ***"
 
 		make clean
+
+		;;
+	-u )
+		# sync and apply local patches
+		shift
+
+		echo "*** syncing replicant-$REPLICANT ***"
+		../tools/repo sync gta04-replicant.git gta04-replicant-device.git gta04-replicant-vendor.git gta04-kernel.git
 
 		;;
 	-s )
@@ -131,6 +139,7 @@ END
 	4.0 )
 		# for Replicant-4.0 we need llvm-gcc or we will run into a compiler/assembler bug
 		# and we need to include some Linux header files to compile the tools
+		# and we have to define ASSEMBLY to avoid some conflicts with the file descriptor types
 		cat >out/host/darwin-x86/bin/gcc <<END
 /usr/bin/llvm-gcc-4.2 -I/Volumes/Replicant/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__ASSEMBLY__ \$@
 END
@@ -243,10 +252,11 @@ do
 	* )
 		echo "*** unknown command $i ignored ***"
 		echo "before sync & initialization"
-		echo "-s sync everything (must be first option)"
-		echo "-c make clean (can't combine with others in same command)"
 		echo "-l use local git files (from file://localhost/...)"
 		echo "-r use remote git files (from git.goldelico.com)"
+		echo "-s sync everything"
+		echo "-u update gta04 parts only"
+		echo "-c make clean"
 		echo "after sync & initialization"
 		echo "-d show build commands"
 		echo "-k build kernel"
