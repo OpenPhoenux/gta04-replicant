@@ -4,7 +4,7 @@
         <remove-project name="replicant/kernel_goldelico_gta04" />
         <remove-project name="replicant/device_goldelico_gta04" />
         <remove-project name="replicant/vendor_replicant" />
-        <project path="kernel/goldelico/gta04" remote="goldelico" name="gta04-kernel.git" revision="3.0-wip-android-gta04"/>
+        <project path="kernel/goldelico/gta04" remote="goldelico" name="gta04-kernel.git" revision="3.12-wip-replicant4"/>
 <!--
         <project path="kernel/goldelico/gta04" remote="goldelico" name="gta04-kernel.git" revision="3.11-wip-replicant4"/>
 -->
