@@ -8,6 +8,8 @@
 
 [ "$REPLICANT" ] || export REPLICANT=2.3
 [ "$DESTDIR" ] || export DESTDIR=$PWD/unstable
+[ "$VOLUME" ] || export VOLUME=/Volumes/Replicant
+[ "$LOCAL_MANIFEST" ] || export LOCAL_MANIFEST="please specify"
 
 #
 # please manually create a very large case sensitive working disk image (each replicant version eats 20-25 GB):
@@ -22,7 +24,7 @@ export COPY_EXTENDED_ATTRIBUTES_DISABLED=true
 # for 10.5
 export COPYFILE_DISABLE=true
 
-cd /Volumes/Replicant
+cd "$VOLUME" || exit 1
 
 if [ ! -x tools/repo ]
 then
@@ -98,7 +100,7 @@ do
 		shift
 
 		echo "*** using localhost ***"
-		cp $THIS/src/gta04-replicant/local_manifests/z.xml .repo/local_manifests/z.xml	# enable localhost git
+		cp $LOCAL_MANIFEST .repo/local_manifests/z.xml	# enable localhost git
 		;;
 	* )
 		break
@@ -139,9 +141,11 @@ END
 	4.0 )
 		# for Replicant-4.0 we need llvm-gcc or we will run into a compiler/assembler bug
 		# and we need to include some Linux header files to compile the tools
-		# and we have to define ASSEMBLY to avoid some conflicts with the file descriptor types
+		# and we have to -DASSEMBLY to avoid some conflicts with the file descriptor types
+		# but only for a 3.0 kernel and not 3.12? So we can make it conditional on LOCAL_TOOLCHAIN
+		[ "$LOCAL_TOOLCHAIN" ] || HOSTCFLAGS="-D__ASSEMBLY__"
 		cat >out/host/darwin-x86/bin/gcc <<END
-/usr/bin/llvm-gcc-4.2 -I/Volumes/Replicant/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__ASSEMBLY__ \$@
+/usr/bin/llvm-gcc-4.2 -I/Volumes/Replicant/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
 END
 		chmod +x out/host/darwin-x86/bin/gcc
 		ln -sf gcc out/host/darwin-x86/bin/cc
@@ -150,7 +154,7 @@ END
 		echo "*** don't know how to compile Replicant-$REPLICANT ***"
 		exit 1
 	esac
-	echo gcc: $(cat out/host/darwin-x86/bin/gcc)
+	echo HOSTCC: $(cat out/host/darwin-x86/bin/gcc)
 	# we need a find that understands -printf from MacPorts
 	if [ ! -x /opt/local/bin/gfind ]
 	then
