@@ -19,6 +19,17 @@ cd rootfs/sbin/ &&
 ln -s ../init init
 )
 
+#FIXME: this should be properly patched in the build system
+#       have a look at vendor/replicant/config/common.mk
+echo "*** fixing file permissions ***"
+chmod 644 rootfs/init*.rc
+chmod 644 rootfs/ueventd*.rc
+chmod 644 rootfs/*.prop
+chmod 644 rootfs/system/lib/modules/*.ko
+chmod 644 rootfs/system/*.prop
+chmod 775 rootfs/system/bin/sysinit
+chmod 775 rootfs/system/bin/handle_compcache
+
 echo "*** generating GTA04 rootfs ***"
 cd rootfs/ &&
 tar cjvf ../gta04-rootfs.tar.bz2 .
