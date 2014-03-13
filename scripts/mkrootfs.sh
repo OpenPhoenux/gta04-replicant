@@ -31,8 +31,10 @@ chmod 775 rootfs/system/bin/sysinit
 chmod 775 rootfs/system/bin/handle_compcache
 
 echo "*** generating GTA04 rootfs ***"
+(
 cd rootfs/ &&
 tar cjvf ../gta04-rootfs.tar.bz2 .
+)
 
 echo "*** cleaning up GTA04 rootfs ***"
 rm -rf rootfs/
