@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
     <manifest>
-       <remote name="goldelico" fetch="http://git.goldelico.com/" />
+       <remote name="goldelico" fetch="git://git.goldelico.com/" />
         <remove-project name="replicant/kernel_goldelico_gta04" />
         <remove-project name="replicant/device_goldelico_gta04" />
         <remove-project name="replicant/vendor_replicant" />
