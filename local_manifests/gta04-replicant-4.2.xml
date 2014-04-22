@@ -9,8 +9,8 @@
         <remove-project name="replicant/kernel_samsung_tuna" />
         <remove-project name="replicant/kernel_samsung_espresso10" />
 
-        <!--<remove-project name="replicant/kernel_goldelico_gta04" />-->
-        <!--<remove-project name="replicant/device_goldelico_gta04" />-->
+        <remove-project name="replicant/kernel_goldelico_gta04" />
+        <remove-project name="replicant/device_goldelico_gta04" />
         <remove-project name="replicant/vendor_replicant" />
 
         <project path="kernel/goldelico/gta04" remote="goldelico" name="gta04-kernel.git" revision="3.12-replicant4"/>
