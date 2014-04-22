@@ -3,7 +3,7 @@
 #
 # tested and debugged on OS X 10.6.8 with Xcode 3.2.6 (gcc 4.2)
 #
-# usage: mrep { -s | -u | -l | -r | -c } { -d | -k | -b | -f | -n }
+# usage: mrep { -s | -u | -l | -r | -c } { -d | -k | -b | -f | -n | -m action }
 #
 
 [ "$REPLICANT" ] || export REPLICANT=2.3
@@ -54,8 +54,8 @@ then
 	mkdir -p .repo/local_manifests
 	MANIFEST="http://git.goldelico.com/?p=gta04-replicant.git;a=blob_plain;f=local_manifests/gta04-replicant-$REPLICANT.xml;hb=refs/heads/master"
 	[ -x "$(which wget)" ] &&
-		wget -O - $MANIFEST > .repo/local_manifests/gta04.xml ||
-		curl $MANIFEST > .repo/local_manifests/gta04.xml
+		wget -O - $MANIFEST > .repo/local_manifests/z.xml ||
+		curl $MANIFEST > .repo/local_manifests/z.xml
 fi
 
 while true
@@ -83,11 +83,11 @@ do
 		echo "*** syncing replicant-$REPLICANT ***"
 		../tools/repo sync
 
-		( cd $THIS/src/replicant/$REPLICANT && find . -name '*.patch' -print ) | while read PATCH
+		( cd $THIS/replicant/$REPLICANT && find . -name '*.patch' -print ) | while read PATCH
 			do
 			DIR=$(dirname "$PATCH")
 			echo "*** patching $PATCH in $DIR ***"
-			( cd $DIR && pwd && git am -3 $THIS/src/replicant/$REPLICANT/$PATCH ) || exit 1
+			( cd $DIR && pwd && git am -3 $THIS/replicant/$REPLICANT/$PATCH ) || exit 1
 			done
 		;;
 	-r )
@@ -124,7 +124,7 @@ then
 		sed -i.bak 's|#include <features.h>|// #include <features.h>|g' out/host/darwin-x86/include/elf.h
 		sed -i.bak 's|__BEGIN_DECLS|// __BEGIN_DECLS|g' out/host/darwin-x86/include/elf.h
 		sed -i.bak 's|__END_DECLS|// __END_DECLS|g' out/host/darwin-x86/include/elf.h
-#		cp $THIS/src/replicant/$REPLICANT/elf.h out/host/darwin-x86/include/elf.h
+#		cp $THIS/replicant/$REPLICANT/elf.h out/host/darwin-x86/include/elf.h
 	fi
 	case "$REPLICANT" in
 	2.3 )
@@ -150,6 +150,19 @@ END
 		chmod +x out/host/darwin-x86/bin/gcc
 		ln -sf gcc out/host/darwin-x86/bin/cc
 		;;
+	4.2 )
+		# for Replicant-4.0 we need llvm-gcc or we will run into a compiler/assembler bug
+		# and we need to include some Linux header files to compile the tools
+		# and we have to -DASSEMBLY to avoid some conflicts with the file descriptor types
+		# but only for a 3.0 kernel and not 3.12? So we can make it conditional on LOCAL_TOOLCHAIN
+		[ "$LOCAL_TOOLCHAIN" ] || HOSTCFLAGS="-D__ASSEMBLY__"
+		cat >out/host/darwin-x86/bin/gcc <<END
+/usr/bin/llvm-gcc-4.2 -I/Volumes/Replicant/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
+END
+		export LOADADDR=0x80008000
+		chmod +x out/host/darwin-x86/bin/gcc
+		ln -sf gcc out/host/darwin-x86/bin/cc
+		;;
 	* )
 		echo "*** don't know how to compile Replicant-$REPLICANT ***"
 		exit 1
@@ -158,13 +171,14 @@ END
 	# we need a find that understands -printf from MacPorts
 	if [ ! -x /opt/local/bin/gfind ]
 	then
-		echo "*** sudo port install coreutils findutils gsed ***"
-		# sudo port install coreutils findutils gsed
+		echo "*** sudo port install coreutils findutils gsed gxargs ***"
+		# sudo port install coreutils findutils gsed gxargs
 	fi
 	ln -sf /opt/local/bin/gfind out/host/darwin-x86/bin/find
 	ln -sf /opt/local/bin/gstat out/host/darwin-x86/bin/stat
 	ln -sf /opt/local/bin/greadlink out/host/darwin-x86/bin/readlink
 	ln -sf /opt/local/bin/gsed out/host/darwin-x86/bin/sed
+	ln -sf /opt/local/bin/gxargs out/host/darwin-x86/bin/xargs
 	ln -sf "$(which gnutar)" out/host/darwin-x86/bin/tar
 
 	if [ ! -r out/host/darwin-x86/bin/mkimage ]
@@ -173,6 +187,7 @@ END
 		chmod a+x out/host/darwin-x86/bin/mkimage
 	fi
 	PATH=$PWD/out/host/darwin-x86/bin:$PATH
+	ls -l out/host/darwin-x86/bin/
 fi
 
 echo "*** lunch replicant_gta04-eng ***"
@@ -185,16 +200,24 @@ case "$REPLICANT" in
 	2.3 )
 		[ "$COMMANDS" ] || COMMANDS="-f -k -n"
 		;;
-	4.0 )
+	4.* )
 		[ "$COMMANDS" ] || COMMANDS="-f -b"
 		;;
 esac
 
 echo "*** run $COMMANDS ***"
+mkdir -p "$DESTDIR"
 
 for i in $COMMANDS
 do
 	case "$i" in
+	-m )
+		CMD=$(echo $COMMANDS | sed 's/.*-m//')
+		echo "*** make $CMD ***"
+		make $CMD
+		exit
+		;;
+
 	-d )
 		echo "*** -d show build commands ***"
 		SHOWCOMMANDS=showcommands
@@ -264,9 +287,10 @@ do
 		echo "after sync & initialization"
 		echo "-d show build commands"
 		echo "-k build kernel"
-		echo "-b build single-partition gta04-rootfs (4.0)"
+		echo "-b build single-partition gta04-rootfs (4.*)"
 		echo "-f build system (2.3)"
 		echo "-n patch system to single-partition rootfs"
+		echo "-m make targets; e.g. -m clean-wpa_supplicant"
 		;;
 	esac
 done
