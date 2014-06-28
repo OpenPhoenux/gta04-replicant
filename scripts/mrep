@@ -6,10 +6,12 @@
 # usage: mrep { -s | -u | -l | -r | -c } { -d | -k | -b | -f | -n | -m action }
 #
 
-[ "$REPLICANT" ] || export REPLICANT=2.3
-[ "$DESTDIR" ] || export DESTDIR=$PWD/unstable
-[ "$VOLUME" ] || export VOLUME=/Volumes/Replicant
+[ "$REPLICANT" ] || export REPLICANT=4.2	# default
+[ "$DESTDIR" ] || export DESTDIR=$PWD
+[ "$VOLUME" ] || export VOLUME="/Volumes/Replicant"
 [ "$LOCAL_MANIFEST" ] || export LOCAL_MANIFEST="please specify"
+[ "$LOCAL_TOOLCHAIN" ] || export LOCAL_TOOLCHAIN=""	# none specified - use built-in toolchain
+
 
 #
 # please manually create a very large case sensitive working disk image (each replicant version eats 20-25 GB):
@@ -24,7 +26,15 @@ export COPY_EXTENDED_ATTRIBUTES_DISABLED=true
 # for 10.5
 export COPYFILE_DISABLE=true
 
-cd "$VOLUME" || exit 1
+cd "$VOLUME" || (
+	echo "please manually create a very large case sensitive working disk image (each replicant version eats 20-25 GB):"
+	if [ ! -r replicant.sparsebundle ]
+	then
+		echo "   hdiutil create -type SPARSEBUNDLE -fs 'Case-sensitive Journaled HFS+' -size 50g -volname Replicant replicant.sparsebundle"
+	fi
+	echo "   open replicant.sparsebundle"
+	exit 1
+)
 
 if [ ! -x tools/repo ]
 then
@@ -48,14 +58,14 @@ else
 	../tools/repo init -u git://gitorious.org/replicant/manifest.git -b replicant-$REPLICANT
 fi
 
-if [ ! -x .repo/local_manifests ]
+if [ ! -e .repo/local_manifests/gta04.xml ]
 then
-	echo "*** installing local manifest ***"
+	echo "*** installing local GTA04 manifest ***"
 	mkdir -p .repo/local_manifests
 	MANIFEST="http://git.goldelico.com/?p=gta04-replicant.git;a=blob_plain;f=local_manifests/gta04-replicant-$REPLICANT.xml;hb=refs/heads/master"
 	[ -x "$(which wget)" ] &&
-		wget -O - $MANIFEST > .repo/local_manifests/z.xml ||
-		curl $MANIFEST > .repo/local_manifests/z.xml
+		wget -O - $MANIFEST > .repo/local_manifests/gta04.xml ||
+		curl $MANIFEST > .repo/local_manifests/gta04.xml
 fi
 
 while true
@@ -65,7 +75,7 @@ do
 		shift
 		echo "*** -c make clean ***"
 
-		make clean
+		make clean || exit 1
 
 		;;
 	-u )
@@ -73,7 +83,7 @@ do
 		shift
 
 		echo "*** syncing replicant-$REPLICANT ***"
-		../tools/repo sync gta04-replicant.git gta04-replicant-device.git gta04-replicant-vendor.git gta04-kernel.git
+		../tools/repo sync gta04-replicant.git gta04-replicant-device.git gta04-replicant-vendor.git gta04-kernel.git || exit 1
 
 		;;
 	-s )
@@ -81,7 +91,7 @@ do
 		shift
 
 		echo "*** syncing replicant-$REPLICANT ***"
-		../tools/repo sync
+		../tools/repo sync || exit 1
 
 		( cd $THIS/replicant/$REPLICANT && find . -name '*.patch' -print ) | while read PATCH
 			do
@@ -93,14 +103,18 @@ do
 	-r )
 		shift
 		
-		echo "*** using git.goldelico.com ***"
+		echo "*** using manifest for git.goldelico.com ***"
 		rm -f .repo/local_manifests/z.xml	# disable localhost git
 		;;
 	-l )
 		shift
 
-		echo "*** using localhost ***"
+		echo "*** using manifest to access localhost ***"
 		cp $LOCAL_MANIFEST .repo/local_manifests/z.xml	# enable localhost git
+		;;
+	-* )
+		echo "usage: mrep { -s | -u | -l | -r | -c } { -d | -k | -b | -f | -n | -m action }"
+		exit 1
 		;;
 	* )
 		break
@@ -214,7 +228,7 @@ do
 	-m )
 		CMD=$(echo $COMMANDS | sed 's/.*-m//')
 		echo "*** make $CMD ***"
-		make $CMD
+		make $CMD || exit 1
 		exit
 		;;
 
@@ -225,7 +239,7 @@ do
 	-f )
 		echo "*** -r make rootfs ***"
 
-		make bootimage BOARD_SDCARD_INIT:=true
+		make bootimage BOARD_SDCARD_INIT:=true || exit 1
 		make $SHOWCOMMANDS systemtarball || exit 1
 
 		;;
@@ -239,24 +253,26 @@ do
 		sed -i.bak 's|CONFIG_INITRAMFS_SOURCE="../../root"|CONFIG_INITRAMFS_SOURCE=""|g' kernel/goldelico/gta04/arch/arm/configs/gta04_defconfig && rm kernel/goldelico/gta04/arch/arm/configs/gta04_defconfig.bak &&
 
 		make $SHOWCOMMANDS bootimage BOARD_SDCARD_INIT:=true || exit 1
-		echo "*** copy to $DESTDIR/kernel ***"
-		cp out/target/product/gta04/kernel "$DESTDIR/kernel"
+		echo "*** copy to $DESTDIR/unstable/kernel ***"
+		mkdir -p "$DESTDIR/unstable/"
+		cp out/target/product/gta04/kernel "$DESTDIR/unstable/kernel"
 		;;
 	-b )
 		echo "*** -b create single partition rootfs $DESTDIR/gta04-rootfs.tar.gz ***"
 
-		./goldelico/scripts/mkrootfs.sh
+		./goldelico/scripts/mkrootfs.sh || exit 1
 
-		echo "*** copy to $DESTDIR/gta04-rootfs.tar.bz2 ***"
-		cp "out/target/product/gta04/gta04-rootfs.tar.bz2" "$DESTDIR/gta04-rootfs.tar.bz2"
-		chmod a+r "$DESTDIR/gta04-rootfs.tar.bz2"
+		echo "*** copy to $DESTDIR/unstable.tbz ***"
+		cp "out/target/product/gta04/gta04-rootfs.tar.bz2" "$DESTDIR/unstable-replicant.tbz"
+		chmod a+r "$DESTDIR/unstable-replicant.tbz"
 		;;
 	-n )
-		echo "*** copy to $DESTDIR/system.tar.bz2 ***"
-		cp "out/target/product/gta04/system.tar.bz2" "$DESTDIR/system.tar.bz2"
-		chmod a+r "$DESTDIR/system.tar.bz2"
+		echo "*** copy to $DESTDIR/unstable/system.tar.bz2 ***"
+		mkdir -p "$DESTDIR/unstable/"
+		cp "out/target/product/gta04/system.tar.bz2" "$DESTDIR/unstable/system.tar.bz2" || exit 1
+		chmod a+r "$DESTDIR/unstable/system.tar.bz2"
 
-		echo "*** -n create $DESTDIR/rootfs.tar.bz2 without initramdisk ***"
+		echo "*** -n create $DESTDIR/unstable/rootfs.tar.bz2 without initramdisk ***"
 		(
 		cd out/target/product/gta04 && 
 		rm -rf rootfs/boot rootfs/sbin/init &&
@@ -273,8 +289,8 @@ do
 		ln -sf ../init rootfs/sbin/init &&
 		tar cjvf rootfs.tar.bz2 --exclude .DS_Store -C rootfs .
 		) &&
-		cp "out/target/product/gta04/rootfs.tar.bz2" "$DESTDIR/rootfs.tar.bz2"
-		chmod a+r "$DESTDIR/rootfs.tar.bz2"
+		cp "out/target/product/gta04/rootfs.tar.bz2" "$DESTDIR/unstable/rootfs.tar.bz2"
+		chmod a+r "$DESTDIR/unstable/rootfs.tar.bz2"
 		;;
 	* )
 		echo "*** unknown command $i ignored ***"
