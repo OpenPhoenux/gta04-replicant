@@ -74,6 +74,7 @@ do
 
 		echo "*** syncing replicant-$REPLICANT ***"
 		../tools/repo sync gta04-replicant.git gta04-replicant-device.git gta04-replicant-vendor.git gta04-kernel.git
+		vendor/replicant/get-prebuilts
 
 		;;
 	-s )
@@ -82,6 +83,7 @@ do
 
 		echo "*** syncing replicant-$REPLICANT ***"
 		../tools/repo sync
+		vendor/replicant/get-prebuilts
 
 		( cd $THIS/src/replicant/$REPLICANT && find . -name '*.patch' -print ) | while read PATCH
 			do
