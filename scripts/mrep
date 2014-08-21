@@ -116,6 +116,24 @@ do
 		;;
 	-* )
 		echo "usage: mrep { -s | -u | -l | -r | -c } { -d | -k | -b | -f | -n | -m action }"
+		echo
+		echo "  before build:"
+		echo "  -s: repo sync everything and apply local patches"
+		echo "  -u: repo sync (i.e. update)"
+		echo "  -l: switch to local manifest"
+		echo "  -r: switch to published (remote) manifest"
+		echo "  -c: force clean build"
+		echo "   default is none of these steps"
+		echo
+		echo "  after build:"
+		echo "  -d: enable debug (show commands)"
+		echo "  -k: make kernel (only)"
+		echo "  -f: make rootfs"
+		echo "  -b: create single partition (binary) rootfs (for 2.3)"
+		echo "  -n: create single partition (binary) rootfs (for 4.x)"
+		echo "  -m: run specified action"
+		echo "   4.x default is -f -k -n"
+		echo "   2.3 default is -f -b"
 		exit 1
 		;;
 	* )
