@@ -8,16 +8,9 @@
 
 [ "$REPLICANT" ] || export REPLICANT=4.2	# default
 [ "$DESTDIR" ] || export DESTDIR=$PWD
-[ "$VOLUME" ] || export VOLUME="/Volumes/Workspace-CaseSensitive"
+[ "$VOLUME" ] || export VOLUME="/Volumes/CaseSensitive"
 [ "$LOCAL_MANIFEST" ] || export LOCAL_MANIFEST="please specify"
 [ "$LOCAL_TOOLCHAIN" ] || export LOCAL_TOOLCHAIN=""	# none specified - use built-in toolchain
-
-
-#
-# please manually create a very large case sensitive working disk image (each replicant version eats 20-25 GB):
-# hdiutil create -type SPARSEBUNDLE -fs 'Case-sensitive Journaled HFS+' -size 50g -volname Replicant replicant.sparsebundle
-# mount as /Volumes/Replicant
-#
 
 THIS=$PWD
 
