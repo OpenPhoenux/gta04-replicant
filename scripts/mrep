@@ -18,6 +18,8 @@ THIS=$PWD
 export COPY_EXTENDED_ATTRIBUTES_DISABLED=true
 # for 10.5
 export COPYFILE_DISABLE=true
+# to compile on OS X 10.9 with SDK 10.9 we need to set this variable (even if we still have Xcode 3.2 installed)
+export BUILD_MAC_SDK_EXPERIMENTAL=1
 
 cd "$VOLUME" || (
 	echo "please manually create a very large case sensitive working disk image (each replicant version eats 20-25 GB):"
@@ -107,7 +109,7 @@ do
 		echo "*** using manifest to access localhost ***"
 		cp $LOCAL_MANIFEST .repo/local_manifests/z.xml	# enable localhost git
 		;;
-	-* )
+	"-?" )
 		echo "usage: mrep { -s | -u | -l | -r | -c } { -d | -k | -b | -f | -n | -m action }"
 		echo
 		echo "  before build:"
@@ -183,12 +185,31 @@ END
 		# and we have to -DASSEMBLY to avoid some conflicts with the file descriptor types
 		# but only for a 3.0 kernel and not 3.12? So we can make it conditional on LOCAL_TOOLCHAIN
 		[ "$LOCAL_TOOLCHAIN" ] || HOSTCFLAGS="-D__ASSEMBLY__"
-		cat >out/host/darwin-x86/bin/gcc <<END
-/usr/bin/llvm-gcc-4.2 -I$VOLUME/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
+		case "$(uname -r)" in
+			13.* )	# 10.9
+			cat >out/host/darwin-x86/bin/gcc <<END
+# echo /usr/bin/cc -I$VOLUME/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
+/usr/bin/cc -I$VOLUME/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
 END
+			cat >out/host/darwin-x86/bin/g++ <<END
+# echo /usr/bin/c++ -I$VOLUME/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
+/usr/bin/c++ -I$VOLUME/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
+END
+			chmod +x out/host/darwin-x86/bin/gcc
+			chmod +x out/host/darwin-x86/bin/g++
+			;;
+			* )	# 10.6.8
+			cat >out/host/darwin-x86/bin/gcc <<END
+/opt/local/bin/llvm-gcc-4.2 -I$VOLUME/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
+END
+			chmod +x out/host/darwin-x86/bin/gcc
+			;;
+		esac
 		export LOADADDR=0x80008000
-		chmod +x out/host/darwin-x86/bin/gcc
+		rm out/host/darwin-x86/bin/cc
+		rm out/host/darwin-x86/bin/c++
 		ln -sf gcc out/host/darwin-x86/bin/cc
+		ln -sf g++ out/host/darwin-x86/bin/c++
 		;;
 	* )
 		echo "*** don't know how to compile Replicant-$REPLICANT ***"
@@ -213,9 +234,23 @@ END
 		curl http://download.goldelico.com/gta04/unstable/scripts/darwin/mkimage > out/host/darwin-x86/bin/mkimage
 		chmod a+x out/host/darwin-x86/bin/mkimage
 	fi
-	PATH=$PWD/out/host/darwin-x86/bin:$PATH
+	case "$(uname -r)" in
+		13.* )	# 10.9
+			# on 10.9 we use the Xcode 6 tools in /usr/bin through our script in out/host/darwin-x86/bin
+			PATH=$PWD/out/host/darwin-x86/bin:$PATH
+			;;
+		* ) # 10.6
+			# Replicant 4 works best with SDK 10.6 and Xcode 3.2
+			PATH=$PWD/out/host/darwin-x86/bin:/Xcode3.2/usr/bin:$PATH
+			;;
+	esac
 	ls -l out/host/darwin-x86/bin/
 fi
+
+echo "*** applying patches ***"
+
+# bug in code makes clang report an error - fixed in Android 5.0
+sed -i.bak s|sizeof((header->version)) != 0))|sizeof(header->version)) != 0)|g frameworks/compile/libbcc/lib/Renderscript/RSInfoReader.cpp
 
 echo "*** lunch replicant_gta04-eng ***"
 
