@@ -250,7 +250,7 @@ fi
 echo "*** applying patches ***"
 
 # bug in code makes clang report an error - fixed in Android 5.0
-sed -i.bak s|sizeof((header->version)) != 0))|sizeof(header->version)) != 0)|g frameworks/compile/libbcc/lib/Renderscript/RSInfoReader.cpp
+sed -i.bak "s|sizeof((header->version)) != 0))|sizeof(header->version)) != 0)|g" frameworks/compile/libbcc/lib/Renderscript/RSInfoReader.cpp
 
 echo "*** lunch replicant_gta04-eng ***"
 
