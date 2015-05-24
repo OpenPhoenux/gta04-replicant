@@ -1,7 +1,7 @@
 #
 # build Replicant on MacOS X / Darwin
 #
-# tested and debugged on OS X 10.6.8 with Xcode 3.2.6 (gcc 4.2)
+# tested and debugged on OS X 10.9.5 with Xcode 6.1 (llvm)
 #
 # usage: mrep { -s | -u | -l | -r | -c } { -d | -k | -b | -f | -n | -m action }
 #
@@ -9,12 +9,14 @@
 [ "$REPLICANT" ] || export REPLICANT=4.2	# default
 [ "$DESTDIR" ] || export DESTDIR=$PWD
 [ "$VOLUME" ] || export VOLUME="/Volumes/CaseSensitive"
+[ "$SERVER" ] || export VOLUME="/Volumes/Server HD/"
 [ "$LOCAL_MANIFEST" ] || export LOCAL_MANIFEST="please specify"
 [ "$LOCAL_TOOLCHAIN" ] || export LOCAL_TOOLCHAIN=""	# none specified - use built-in toolchain
 
 [ -x "$DESTDIR" ] || {
 	echo "server down - can't reach $DESTDIR to store resulting package"
-	exit 1
+	mkdir -p "$SERVER"
+	mount_smbfs "//$USER:$(cat ~/.ssh/www.goldelico.com)@www.goldelico.com/Server%20HD" "$SERVER" || exit 1
 }
 
 THIS=$PWD
