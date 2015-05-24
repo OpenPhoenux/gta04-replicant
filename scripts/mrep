@@ -12,6 +12,11 @@
 [ "$LOCAL_MANIFEST" ] || export LOCAL_MANIFEST="please specify"
 [ "$LOCAL_TOOLCHAIN" ] || export LOCAL_TOOLCHAIN=""	# none specified - use built-in toolchain
 
+[ -x "$DESTDIR" ] || {
+	echo "server down - can't reach $DESTDIR to store resulting package"
+	exit 1
+}
+
 THIS=$PWD
 
 # protect against copying/storing ._ files
