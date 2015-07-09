@@ -1,23 +1,23 @@
 #
 # build Replicant on MacOS X / Darwin
 #
-# tested and debugged on OS X 10.6.8 with Xcode 3.2.6 (gcc 4.2)
+# tested and debugged on OS X 10.9.5 with Xcode 6.1 (llvm)
 #
 # usage: mrep { -s | -u | -l | -r | -c } { -d | -k | -b | -f | -n | -m action }
 #
 
 [ "$REPLICANT" ] || export REPLICANT=4.2	# default
 [ "$DESTDIR" ] || export DESTDIR=$PWD
-[ "$VOLUME" ] || export VOLUME="/Volumes/Replicant"
+[ "$VOLUME" ] || export VOLUME="/Volumes/CaseSensitive"
+[ "$SERVER" ] || export VOLUME="/Volumes/Server HD/"
 [ "$LOCAL_MANIFEST" ] || export LOCAL_MANIFEST="please specify"
 [ "$LOCAL_TOOLCHAIN" ] || export LOCAL_TOOLCHAIN=""	# none specified - use built-in toolchain
 
-
-#
-# please manually create a very large case sensitive working disk image (each replicant version eats 20-25 GB):
-# hdiutil create -type SPARSEBUNDLE -fs 'Case-sensitive Journaled HFS+' -size 50g -volname Replicant replicant.sparsebundle
-# mount as /Volumes/Replicant
-#
+[ -x "$DESTDIR" ] || {
+	echo "server down - can't reach $DESTDIR to store resulting package"
+	mkdir -p "$SERVER"
+	mount_smbfs "//$USER:$(cat ~/.ssh/www.goldelico.com)@www.goldelico.com/Server%20HD" "$SERVER" || exit 1
+}
 
 THIS=$PWD
 
@@ -25,12 +25,14 @@ THIS=$PWD
 export COPY_EXTENDED_ATTRIBUTES_DISABLED=true
 # for 10.5
 export COPYFILE_DISABLE=true
+# to compile on OS X 10.9 with SDK 10.9 we need to set this variable (even if we still have Xcode 3.2 installed)
+export BUILD_MAC_SDK_EXPERIMENTAL=1
 
 cd "$VOLUME" || (
 	echo "please manually create a very large case sensitive working disk image (each replicant version eats 20-25 GB):"
 	if [ ! -r replicant.sparsebundle ]
 	then
-		echo "   hdiutil create -type SPARSEBUNDLE -fs 'Case-sensitive Journaled HFS+' -size 50g -volname Replicant replicant.sparsebundle"
+		echo "   hdiutil create -type SPARSEBUNDLE -fs 'Case-sensitive Journaled HFS+' -size 50g -volname Workspace-CaseSensitive replicant.sparsebundle"
 	fi
 	echo "   open replicant.sparsebundle"
 	exit 1
@@ -114,8 +116,26 @@ do
 		echo "*** using manifest to access localhost ***"
 		cp $LOCAL_MANIFEST .repo/local_manifests/z.xml	# enable localhost git
 		;;
-	-* )
+	"-?" )
 		echo "usage: mrep { -s | -u | -l | -r | -c } { -d | -k | -b | -f | -n | -m action }"
+		echo
+		echo "  before build:"
+		echo "  -s: repo sync everything and apply local patches"
+		echo "  -u: repo sync (i.e. update)"
+		echo "  -l: switch to local manifest"
+		echo "  -r: switch to published (remote) manifest"
+		echo "  -c: force clean build"
+		echo "   default is none of these steps"
+		echo
+		echo "  after build:"
+		echo "  -d: enable debug (show commands)"
+		echo "  -k: make kernel (only)"
+		echo "  -f: make rootfs"
+		echo "  -b: create single partition (binary) rootfs (for 2.3)"
+		echo "  -n: create single partition (binary) rootfs (for 4.x)"
+		echo "  -m: run specified action"
+		echo "   4.x default is -f -k -n"
+		echo "   2.3 default is -f -b"
 		exit 1
 		;;
 	* )
@@ -147,8 +167,8 @@ then
 		# for Replicant-2.3 we need standard gcc (not llvm-gcc) and have to explicitly add libstdc++ to avoid some errors
 		# g++ compilation needs libstdc++; this will print a harmless warning for standard C (e.g. when building the kernel)
 		cat >out/host/darwin-x86/bin/gcc <<END
-# echo /usr/bin/gcc-4.2 -I/Volumes/Replicant/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter /Volumes/Replicant/replicant-2.3/kernel/goldelico/gta04/include '-DACCESSPERMS=(S_IRWXU|S_IRWXG|S_IRWXO)' \$@ -lSystem -lstdc++
-/usr/bin/gcc-4.2 -I/Volumes/Replicant/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter /Volumes/Replicant/replicant-2.3/kernel/goldelico/gta04/include '-DACCESSPERMS=(S_IRWXU|S_IRWXG|S_IRWXO)' \$@ -lSystem -lstdc++
+# echo /usr/bin/gcc-4.2 -I$VOLUME/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $VOLUME/replicant-2.3/kernel/goldelico/gta04/include '-DACCESSPERMS=(S_IRWXU|S_IRWXG|S_IRWXO)' \$@ -lSystem -lstdc++
+/usr/bin/gcc-4.2 -I$VOLUME/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $VOLUME/replicant-2.3/kernel/goldelico/gta04/include '-DACCESSPERMS=(S_IRWXU|S_IRWXG|S_IRWXO)' \$@ -lSystem -lstdc++
 END
 		chmod +x out/host/darwin-x86/bin/gcc
 		ln -sf gcc out/host/darwin-x86/bin/cc
@@ -161,7 +181,7 @@ END
 		# but only for a 3.0 kernel and not 3.12? So we can make it conditional on LOCAL_TOOLCHAIN
 		[ "$LOCAL_TOOLCHAIN" ] || HOSTCFLAGS="-D__ASSEMBLY__"
 		cat >out/host/darwin-x86/bin/gcc <<END
-/usr/bin/llvm-gcc-4.2 -I/Volumes/Replicant/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
+/usr/bin/llvm-gcc-4.2 -I$VOLUME/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
 END
 		chmod +x out/host/darwin-x86/bin/gcc
 		ln -sf gcc out/host/darwin-x86/bin/cc
@@ -172,12 +192,31 @@ END
 		# and we have to -DASSEMBLY to avoid some conflicts with the file descriptor types
 		# but only for a 3.0 kernel and not 3.12? So we can make it conditional on LOCAL_TOOLCHAIN
 		[ "$LOCAL_TOOLCHAIN" ] || HOSTCFLAGS="-D__ASSEMBLY__"
-		cat >out/host/darwin-x86/bin/gcc <<END
-/usr/bin/llvm-gcc-4.2 -I/Volumes/Replicant/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
+		case "$(uname -r)" in
+			13.* )	# 10.9
+			cat >out/host/darwin-x86/bin/gcc <<END
+# echo /usr/bin/cc -I$VOLUME/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
+/usr/bin/cc -I$VOLUME/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
 END
+			cat >out/host/darwin-x86/bin/g++ <<END
+# echo /usr/bin/c++ -I$VOLUME/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
+/usr/bin/c++ -I$VOLUME/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
+END
+			chmod +x out/host/darwin-x86/bin/gcc
+			chmod +x out/host/darwin-x86/bin/g++
+			;;
+			* )	# 10.6.8
+			cat >out/host/darwin-x86/bin/gcc <<END
+/opt/local/bin/llvm-gcc-4.2 -I$VOLUME/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
+END
+			chmod +x out/host/darwin-x86/bin/gcc
+			;;
+		esac
 		export LOADADDR=0x80008000
-		chmod +x out/host/darwin-x86/bin/gcc
+		rm out/host/darwin-x86/bin/cc
+		rm out/host/darwin-x86/bin/c++
 		ln -sf gcc out/host/darwin-x86/bin/cc
+		ln -sf g++ out/host/darwin-x86/bin/c++
 		;;
 	* )
 		echo "*** don't know how to compile Replicant-$REPLICANT ***"
@@ -202,9 +241,23 @@ END
 		curl http://download.goldelico.com/gta04/unstable/scripts/darwin/mkimage > out/host/darwin-x86/bin/mkimage
 		chmod a+x out/host/darwin-x86/bin/mkimage
 	fi
-	PATH=$PWD/out/host/darwin-x86/bin:$PATH
+	case "$(uname -r)" in
+		13.* )	# 10.9
+			# on 10.9 we use the Xcode 6 tools in /usr/bin through our script in out/host/darwin-x86/bin
+			PATH=$PWD/out/host/darwin-x86/bin:$PATH
+			;;
+		* ) # 10.6
+			# Replicant 4 works best with SDK 10.6 and Xcode 3.2
+			PATH=$PWD/out/host/darwin-x86/bin:/Xcode3.2/usr/bin:$PATH
+			;;
+	esac
 	ls -l out/host/darwin-x86/bin/
 fi
+
+echo "*** applying patches ***"
+
+# bug in code makes clang report an error - fixed in Android 5.0
+sed -i.bak "s|sizeof((header->version)) != 0))|sizeof(header->version)) != 0)|g" frameworks/compile/libbcc/lib/Renderscript/RSInfoReader.cpp
 
 echo "*** lunch replicant_gta04-eng ***"
 
