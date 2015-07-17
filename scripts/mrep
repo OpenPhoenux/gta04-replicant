@@ -9,14 +9,20 @@
 [ "$REPLICANT" ] || export REPLICANT=4.2	# default
 [ "$DESTDIR" ] || export DESTDIR=$PWD
 [ "$VOLUME" ] || export VOLUME="/Volumes/CaseSensitive"
-[ "$SERVER" ] || export VOLUME="/Volumes/Server HD/"
+[ "$SERVER" ] || export SERVER="/Volumes/Server HD/"
 [ "$LOCAL_MANIFEST" ] || export LOCAL_MANIFEST="please specify"
 [ "$LOCAL_TOOLCHAIN" ] || export LOCAL_TOOLCHAIN=""	# none specified - use built-in toolchain
 
 [ -x "$DESTDIR" ] || {
 	echo "server down - can't reach $DESTDIR to store resulting package"
 	mkdir -p "$SERVER"
-	mount_smbfs "//$USER:$(cat ~/.ssh/www.goldelico.com)@www.goldelico.com/Server%20HD" "$SERVER" || exit 1
+	if mount_smbfs "//$USER:$(cat ~/.ssh/www.goldelico.com)@www.goldelico.com/Server%20HD" "$SERVER"
+	then
+		echo "successfully mounted as $SERVER"
+	else
+		rmdir "$SERVER"
+		exit 1
+	fi
 }
 
 THIS=$PWD
