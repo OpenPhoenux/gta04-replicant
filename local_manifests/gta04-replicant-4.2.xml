@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
     <manifest>
-        <remote name="goldelico" fetch="git://git.goldelico.com/" />
+        <remote name="goldelico" fetch="https://github.com/goldelico/" />
 
         <!-- Remove unneeded samsung kernels, to save space and traffic -->
         <remove-project name="replicant/kernel_samsung_aries.git" />
