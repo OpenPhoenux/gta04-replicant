@@ -61,7 +61,7 @@ cd "$VOLUME" || (
 	echo "please manually create a very large case sensitive working disk image (each replicant version eats 20-25 GB):"
 	if [ ! -r replicant.sparsebundle ]
 	then
-		echo "   hdiutil create -type SPARSEBUNDLE -fs 'Case-sensitive Journaled HFS+' -size 50g -volname Workspace-CaseSensitive replicant.sparsebundle"
+		echo "   hdiutil create -type SPARSEBUNDLE -fs 'Case-sensitive Journaled HFS+' -size 50g -volname $(basename $VOLUME) replicant.sparsebundle"
 	fi
 	echo "   open replicant.sparsebundle"
 	exit 1
@@ -71,7 +71,7 @@ if [ ! -x tools/repo ]
 then
 	echo "*** fetching the repo tool ***"
 	mkdir -p tools
-	REPO="https://dl-ssl.google.com/dl/googlesource/git-repo/repo"
+	REPO="https://storage.googleapis.com/git-repo-downloads/repo"
 	[ -x "$(which wget)" ] &&
 		wget -O - $REPO > tools/repo ||
 		curl $REPO > tools/repo
