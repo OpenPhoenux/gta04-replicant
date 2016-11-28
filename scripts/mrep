@@ -12,10 +12,11 @@
 [ "$LOCAL_TOOLCHAIN" ] || export LOCAL_TOOLCHAIN=""	# none specified - use built-in toolchain
 
 function usage {
-	echo "usage: mrep [ -R version ] { | -v branch | -s | -u | -l | -r | -c | -d | -o file | -mail mail@host } { -k | -b | -f | -n | -m action }"
+	echo "usage: mrep [ -R version ] [ -C ] { -v branch | -s | -u | -l | -r | -c | -d | -o file | -mail mail@host } { -k | -b | -f | -n | -m action }"
 	echo
 	echo "  before build (setup):"
 	echo "  -R version: replicant version (known: 2.3, 4.0, 4.2, 6.0)"
+	echo "  -C: wipe out whole workspace to trigger fresh load (waits 10 seconds to abort)"
 	echo "  -v branch: checkout remote manifest from this branch"
 	echo "  -o file: name of output file"
 	echo "  -mail address: notify by mail when started and when done"
@@ -41,6 +42,7 @@ if [ "$1" = "-R" ]
 then
 	shift
 	REPLICANT="$1"
+	echo "*** selected Replicant $REPLICANT ***"
 	shift
 fi
 
@@ -49,7 +51,7 @@ fi
 	mkdir -p "$SERVER"
 	if mount_smbfs "//$USER:$(cat ~/.ssh/www.goldelico.com)@www.goldelico.com/Server%20HD" "$SERVER"
 	then
-		echo "successfully mounted as $SERVER"
+		echo "*** successfully mounted as $SERVER ***"
 	else
 		rmdir "$SERVER"
 		exit 1
@@ -74,6 +76,16 @@ cd "$VOLUME" || (
 	echo "   open replicant.sparsebundle"
 	exit 1
 )
+
+if [ "$1" = "-C" ]
+then
+	shift
+	echo "*** wiping out whole workspace in 10 seconds (ctl-C to abort) ***"
+	sleep 10
+	echo "*** now wiping out ***"
+	rm -rf "./tools" "./replicant-$REPLICANT"
+# FIXME: can we force -s?
+fi
 
 if [ ! -x tools/repo ]
 then
