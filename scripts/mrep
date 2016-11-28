@@ -139,6 +139,7 @@ do
 			done
 		;;
 
+# FIXME: require to specify the branch name $VERSION as -r parameter?
 	-r )
 		echo "*** installing remote GTA04 manifest from branch $VERSION ***"
 		mkdir -p .repo/local_manifests
@@ -147,15 +148,17 @@ do
 			wget -O - $MANIFEST > .repo/local_manifests/gta04.xml ||
 			curl $MANIFEST > .repo/local_manifests/gta04.xml
 
-		rm -f .repo/local_manifests/z.xml	# disable localhost git
+		rm -f .repo/local_manifests/local-dev.xml	# disable any localhost git
 		;;
 
+# FIXME: require to specify the local file $LOCAL_MANIFEST as -l parameter?
 	-l )
 		echo "*** using manifest to access localhost ***"
 
 		echo "broken"; exit 1
 
-		cp $LOCAL_MANIFEST .repo/local_manifests/z.xml	# enable localhost git
+		# name of local manifest must come after "gta04.xml" to be able to overwrite
+		cp $LOCAL_MANIFEST .repo/local_manifests/local-dev.xml	# enable localhost git
 		;;
 
 	-o )
@@ -196,6 +199,12 @@ then
 fi
 
 echo "*** envsetup ***"
+
+if [ ! -r build/envsetup.sh ]
+then
+	echo "*** envsetup.sh is missing - redo sync ***"
+	exit 1
+fi
 
 source build/envsetup.sh
 
