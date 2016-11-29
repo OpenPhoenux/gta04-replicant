@@ -5,9 +5,8 @@
 #
 
 [ "$REPLICANT" ] || export REPLICANT=4.2	# default
-[ "$DESTDIR" ] || export DESTDIR=$PWD
 [ "$VOLUME" ] || export VOLUME="/Volumes/CaseSensitive"
-[ "$SERVER" ] || export SERVER="/Volumes/Server HD/"
+[ "$DESTDIR" ] || export DESTDIR=/tmp
 [ "$REPO" ] || export 	REPO="https://storage.googleapis.com/git-repo-downloads/repo"
 [ "$REMOTE_MANIFEST" ] || export REMOTE_MANIFEST=https://replicantmirror.fossencdi.org/replicant/manifest
 # export GIT_SSL_NO_VERIFY=true	# we can decide to ignore that REMOTE_MANIFEST has an invalid certificate...
@@ -49,15 +48,24 @@ then
 	shift
 fi
 
-[ -x "$(dirname "$DESTDIR")" ] || {
-	echo "server down - can't reach $DESTDIR to store resulting package"
-	mkdir -p "$SERVER"
-	if mount_smbfs "//$USER:$(cat ~/.ssh/www.goldelico.com)@www.goldelico.com/Server%20HD" "$SERVER"
+SERVER=$(expr "$DESTDIR" : '\(/Volumes/[^/]*/\).*')
+# echo $DESTDIR $SERVER
+[ "$SERVER" -a -x "$(dirname "$DESTDIR")" ] || {
+	if [ "$(hostname)" = "www.goldelico.private" ]
 	then
-		echo "*** successfully mounted as $SERVER ***"
+		echo "*** running on server ***"
+		DESTDIR=/$(echo "$DESTDIR" | sed 's|/Volumes/[^/]*/||')
+#		echo $DESTDIR
 	else
-		rmdir "$SERVER"
-		exit 1
+		echo "*** server down - can't reach $SERVER to store resulting package ***"
+		mkdir -p "$SERVER"
+		if mount_smbfs "//$USER:$(cat ~/.ssh/www.goldelico.com)@www.goldelico.com/Server%20HD" "$SERVER"
+		then
+			echo "*** successfully mounted as $SERVER ***"
+		else
+			rmdir "$SERVER"
+			exit 1
+		fi
 	fi
 }
 
@@ -70,7 +78,8 @@ export COPYFILE_DISABLE=true
 # to compile on OS X 10.9 with SDK 10.9 we need to set this variable (even if we still have Xcode 3.2 installed)
 export BUILD_MAC_SDK_EXPERIMENTAL=1
 
-cd "$VOLUME" || (
+if ! cd "$VOLUME"
+then
 	echo "please manually create a very large case sensitive working disk image (each replicant version eats 20-25 GB):"
 	if [ ! -r replicant.sparsebundle ]
 	then
@@ -78,7 +87,7 @@ cd "$VOLUME" || (
 	fi
 	echo "   open replicant.sparsebundle"
 	exit 1
-)
+fi
 
 if [ "$1" = "-C" ]
 then
