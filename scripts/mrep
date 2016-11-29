@@ -10,6 +10,7 @@
 [ "$SERVER" ] || export SERVER="/Volumes/Server HD/"
 [ "$REPO" ] || export 	REPO="https://storage.googleapis.com/git-repo-downloads/repo"
 [ "$REMOTE_MANIFEST" ] || export REMOTE_MANIFEST=https://replicantmirror.fossencdi.org/replicant/manifest
+# export GIT_SSL_NO_VERIFY=true	# we can decide to ignore that REMOTE_MANIFEST has an invalid certificate...
 [ "$LOCAL_MANIFEST" ] || export LOCAL_MANIFEST="please specify"
 [ "$LOCAL_TOOLCHAIN" ] || export LOCAL_TOOLCHAIN=""	# none specified - use built-in toolchain
 
@@ -98,11 +99,6 @@ then
 		curl $REPO > tools/repo
 	chmod a+x tools/repo
 fi
-
-# replicant is using an untrusted certificate for https
-# but we trust replicant...
-# alternatively we have to install a ca_cert certificate we can't trust either (or it would be in the system distribution)
-export GIT_SSL_NO_VERIFY=true
 
 if [ -x replicant-$REPLICANT/build/envsetup.sh ]
 then
