@@ -8,6 +8,8 @@
 [ "$DESTDIR" ] || export DESTDIR=$PWD
 [ "$VOLUME" ] || export VOLUME="/Volumes/CaseSensitive"
 [ "$SERVER" ] || export SERVER="/Volumes/Server HD/"
+[ "$REPO" ] || export 	REPO="https://storage.googleapis.com/git-repo-downloads/repo"
+[ "$REMOTE_MANIFEST" ] || export REMOTE_MANIFEST=https://replicantmirror.fossencdi.org/replicant/manifest
 [ "$LOCAL_MANIFEST" ] || export LOCAL_MANIFEST="please specify"
 [ "$LOCAL_TOOLCHAIN" ] || export LOCAL_TOOLCHAIN=""	# none specified - use built-in toolchain
 
@@ -91,7 +93,6 @@ if [ ! -x tools/repo ]
 then
 	echo "*** fetching the repo tool ***"
 	mkdir -p tools
-	REPO="https://storage.googleapis.com/git-repo-downloads/repo"
 	[ -x "$(which wget)" ] &&
 		wget -O - $REPO > tools/repo ||
 		curl $REPO > tools/repo
@@ -111,7 +112,7 @@ else
 	echo "*** initializing to replicant-$REPLICANT ***"
 	mkdir -p replicant-$REPLICANT
 	cd replicant-$REPLICANT/
-	../tools/repo init -u https://git.replicant.us/replicant/manifest.git -b replicant-$REPLICANT || (rm -rf ../replicant-$REPLICANT/)
+	../tools/repo init -u "$REMOTE_MANIFEST" -b "replicant-$REPLICANT" || (rm -rf ../replicant-$REPLICANT/)
 fi
 
 OUTFILE=rootfs.tar.bz2
