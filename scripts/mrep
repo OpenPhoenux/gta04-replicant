@@ -92,8 +92,8 @@ fi
 if [ "$1" = "-C" ]
 then
 	shift
-	echo "*** wiping out whole workspace in 10 seconds (ctl-C to abort) ***"
-	sleep 10
+	echo "*** Do you really want to wipe out the whole workspace (ctl-C to abort)? ***"
+	read X
 	echo "*** now wiping out ***"
 	rm -rf "./tools" "./replicant-$REPLICANT"
 # FIXME: can we force -s?
@@ -109,7 +109,7 @@ then
 	chmod a+x tools/repo
 fi
 
-if [ -x replicant-$REPLICANT/build/envsetup.sh ]
+if [ -r replicant-$REPLICANT/build/envsetup.sh ]
 then
 	echo "*** switching to replicant-$REPLICANT ***"
 	cd replicant-$REPLICANT/
@@ -117,7 +117,13 @@ else
 	echo "*** initializing to replicant-$REPLICANT ***"
 	mkdir -p replicant-$REPLICANT
 	cd replicant-$REPLICANT/
-	../tools/repo init -u "$REMOTE_MANIFEST" -b "replicant-$REPLICANT" || (rm -rf ../replicant-$REPLICANT/)
+	if ! ../tools/repo init -u "$REMOTE_MANIFEST" -b "replicant-$REPLICANT"
+	then
+		echo "*** repo init failed ***"
+		echo "*** Do you want to wipe out the whole workspace (ctl-C to abort)? ***"
+		read X
+		rm -rf "./tools" "./replicant-$REPLICANT"
+	fi
 fi
 
 OUTFILE=rootfs.tar.bz2
@@ -271,9 +277,11 @@ END
 		[ "$LOCAL_TOOLCHAIN" ] || HOSTCFLAGS="-D__ASSEMBLY__"
 		case "$(uname -r)" in
 			15.* )	# 10.11
+				fgrep 'javac_version := ' build/core/main.mk
 				sed -i.bak 's|mac_sdk_versions_supported :=  10.9 10.7 10.8|mac_sdk_versions_supported :=  10.11 10.10 10.9 10.7 10.8|g' build/core/combo/HOST_darwin-x86.mk
-				sed -i.bak 's/javac_version := $(shell javac -version 2>&1 | head -n 1 | grep '\''[ "]1\\.[67][\\. "$$]'\'')/javac_version := $(shell javac -version 2>&1 | head -n 1 | grep '\''[ "]1\\.[6789][\\. "$$]'\'')/g' build/core/main.mk &&
+				sed -i.bak 's/javac_version := .*/javac_version := $(shell javac -version 2>\&1 | head -n 1 | grep '\''[ "]1\\.[6789][\\. "$$]'\'')/g' build/core/main.mk &&
 				sed -i.bak 's/(info The correct version is: 1.6 or 1.7.)/(info The correct version is: 1.6 or 1.7 or 1.8 or 1.9.)/g' build/core/main.mk
+				fgrep 'javac_version := ' build/core/main.mk
 
 				cat >out/host/darwin-x86/bin/gcc <<END
 # echo /usr/bin/cc -I$VOLUME/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
