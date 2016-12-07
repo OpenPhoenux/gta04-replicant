@@ -479,7 +479,7 @@ then
 	# send notification mail about success
 	(
 		echo started: $START
-		ls -l out/target/product/gta04
+		ls -l . out/target/product/gta04
 		echo $STATUS: $(date)
 	) | mail -s "mrep on $(hostname) $STATUS" "$MAILTO"
 fi
