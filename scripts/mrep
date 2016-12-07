@@ -59,6 +59,7 @@ SERVER=$(expr "$DESTDIR" : '\(/Volumes/[^/]*/\).*')
 	else
 		echo "*** server down - can't reach $SERVER to store resulting package ***"
 		mkdir -p "$SERVER"
+		echo "*** trying to mount //www.goldelico.com/Server%20HD as $SERVER ***"
 		if mount_smbfs "//$USER:$(cat ~/.ssh/www.goldelico.com)@www.goldelico.com/Server%20HD" "$SERVER"
 		then
 			echo "*** successfully mounted as $SERVER ***"
@@ -228,7 +229,7 @@ if (
 
 if [ ! -r build/envsetup.sh ]
 then
-	echo "*** envsetup.sh is missing - redo sync ***"
+	echo "*** envsetup.sh is missing - to resync run again with -s ***"
 	exit 1
 fi
 
@@ -285,13 +286,20 @@ END
 				sed -i.bak 's/(info The correct version is: 1.6 or 1.7.)/(info The correct version is: 1.6 or 1.7 or 1.8 or 1.9.)/g' build/core/main.mk
 				fgrep 'javac_version := ' build/core/main.mk
 
+				# define a gcc wrapper
+				GCC=/usr/bin/cc	# system llvm
+				GPP=/usr/bin/c++	# system llvm
+
+				GCC=/opt/local/bin/gcc	# gcc by macports
+				GPP=/opt/local/bin/g++	# gcc by macports
+
 				cat >out/host/darwin-x86/bin/gcc <<END
 # echo /usr/bin/cc -I$VOLUME/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
-/usr/bin/cc -I$VOLUME/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
+$GCC -I$VOLUME/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
 END
 				cat >out/host/darwin-x86/bin/g++ <<END
 # echo /usr/bin/c++ -I$VOLUME/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
-/usr/bin/c++ -I$VOLUME/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
+$GPP -I$VOLUME/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
 END
 				chmod +x out/host/darwin-x86/bin/gcc
 				chmod +x out/host/darwin-x86/bin/g++
