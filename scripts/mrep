@@ -14,11 +14,13 @@
 [ "$LOCAL_TOOLCHAIN" ] || export LOCAL_TOOLCHAIN=""	# none specified - use built-in toolchain
 
 function usage {
-	echo "usage: mrep [ -R version ] [ -C ] { -v branch | -s | -u | -l | -r | -c | -d | -o file | -mail mail@host } { -k | -b | -f | -n | -m action }"
+	echo "usage: mrep [ -R version ] [ -C ] { -v branch | -s | -u | -l | -r | -co | -c | -d | -o file | -mail mail@host } { -k | -b | -f | -n | -m action }"
 	echo
 	echo "  before build (setup):"
 	echo "  -R version: replicant version (known: 2.3, 4.0, 4.2, 6.0)"
 	echo "  -C: wipe out whole workspace to trigger fresh load (waits 10 seconds to abort)"
+	echo "  -co: wipe out the 'out' directory"
+	echo "  -c: force make clean before make"
 	echo "  -v branch: checkout remote manifest from this branch"
 	echo "  -o file: name of output file"
 	echo "  -mail address: notify by mail when started and when done"
@@ -26,7 +28,6 @@ function usage {
 	echo "  -u: repo sync (i.e. update) gta04 support"
 	echo "  -l: switch to a local manifest"
 	echo "  -r: switch to a published (remote) manifest"
-	echo "  -c: force clean build"
 	echo "  -d: enable debug (show commands)"
 	echo "   default is none of these"
 	echo
@@ -136,6 +137,11 @@ do
 	-v )
 		shift
 		VERSION=$1
+		;;
+
+	-co )
+		echo "*** -co wipe out the 'out' directory ***"
+		rm -rf out
 		;;
 
 	-c )
