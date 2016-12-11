@@ -119,7 +119,7 @@ then
 	echo "*** switching to replicant-$REPLICANT ***"
 	cd replicant-$REPLICANT/
 else
-	echo "*** initializing to replicant-$REPLICANT ***"
+	echo "*** initializing $REMOTE_MANIFEST -b replicant-$REPLICANT ***"
 	mkdir -p replicant-$REPLICANT
 	cd replicant-$REPLICANT/
 	if ! ../tools/repo init -u "$REMOTE_MANIFEST" -b "replicant-$REPLICANT"
