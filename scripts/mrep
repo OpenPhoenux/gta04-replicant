@@ -49,26 +49,29 @@ then
 	shift
 fi
 
-SERVER=$(expr "$DESTDIR" : '\(/Volumes/[^/]*/\).*')
-# echo $DESTDIR $SERVER
-[ "$SERVER" -a -x "$(dirname "$DESTDIR")" ] || {
-	if [ "$(hostname)" = "www.goldelico.private" ]
-	then
-		echo "*** running on server ***"
-		DESTDIR=/$(echo "$DESTDIR" | sed 's|/Volumes/[^/]*/||')
-#		echo $DESTDIR
-	else
-		echo "*** server down - can't reach $SERVER to store resulting package ***"
-		mkdir -p "$SERVER"
-		echo "*** trying to mount //www.goldelico.com/Server%20HD as $SERVER ***"
-		if mount_smbfs "//$USER:$(cat ~/.ssh/www.goldelico.com)@www.goldelico.com/Server%20HD" "$SERVER"
+function init_server {
+	SERVER=$(expr "$DESTDIR" : '\(/Volumes/[^/]*/\).*')
+	# echo $DESTDIR $SERVER
+	[ "$SERVER" -a -x "$(dirname "$DESTDIR")" ] || {
+		if [ "$(hostname)" = "www.goldelico.private" ]
 		then
-			echo "*** successfully mounted as $SERVER ***"
+			echo "*** running on server ***"
+			DESTDIR=/$(echo "$DESTDIR" | sed 's|/Volumes/[^/]*/||')
+#			echo $DESTDIR
 		else
-			rmdir "$SERVER"
-			exit 1
+			echo "*** server down - can't reach $SERVER to store resulting package ***"
+			mkdir -p "$SERVER"
+			echo "*** trying to mount //www.goldelico.com/Server%20HD as $SERVER ***"
+			if mount_smbfs "//$USER:$(cat ~/.ssh/www.goldelico.com)@www.goldelico.com/Server%20HD" "$SERVER"
+			then
+				echo "*** successfully mounted as $SERVER ***"
+			else
+				rmdir "$SERVER"
+				exit 1
+			fi
 		fi
-	fi
+	}
+	mkdir -p "$DESTDIR"
 }
 
 THIS=$PWD
@@ -407,8 +410,8 @@ then # set default commands
 	esac
 fi
 
+
 echo "*** run $COMMANDS ***"
-mkdir -p "$DESTDIR"
 
 for i
 do
@@ -437,20 +440,24 @@ do
 		sed -i.bak 's|CONFIG_INITRAMFS_SOURCE="../../root"|CONFIG_INITRAMFS_SOURCE=""|g' kernel/goldelico/gta04/arch/arm/configs/gta04_defconfig && rm kernel/goldelico/gta04/arch/arm/configs/gta04_defconfig.bak &&
 
 		make $SHOWCOMMANDS bootimage BOARD_SDCARD_INIT:=true || exit 1
+		init_server
 		echo "*** copy to $DESTDIR/unstable/kernel ***"
 		mkdir -p "$DESTDIR/unstable/"
 		cp out/target/product/gta04/kernel "$DESTDIR/unstable/kernel"
 		;;
 	-b )
+		init_server
 		echo "*** -b create single partition rootfs $DESTDIR/gta04-rootfs.tar.gz ***"
 
 		./goldelico/scripts/mkrootfs.sh || exit 1
 
+		init_server
 		echo "*** copy to $DESTDIR/unstable.tbz ***"
 		cp "out/target/product/gta04/gta04-rootfs.tar.bz2" "$DESTDIR/unstable-replicant.tbz"
 		chmod a+r "$DESTDIR/unstable-replicant.tbz"
 		;;
 	-n )
+		init_server
 		echo "*** -n copy to $DESTDIR/unstable/system.tar.bz2 ***"
 		mkdir -p "$DESTDIR/unstable/"
 		cp "out/target/product/gta04/system.tar.bz2" "$DESTDIR/unstable/system.tar.bz2" || exit 1
