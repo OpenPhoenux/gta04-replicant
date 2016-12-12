@@ -364,7 +364,7 @@ END
 		if [ ! -x /opt/local/bin/g$tool ]
 		then
 			echo "!!! missing /opt/local/bin/g$tool !!!"
-			echo "run 'sudo port install port install coreutils findutils gsed gxargs'"
+			echo "run 'sudo port install coreutils findutils gsed gxargs'"
 			exit 1
 		fi
 		ln -sf /opt/local/bin/g$tool out/host/darwin-x86/bin/$tool
