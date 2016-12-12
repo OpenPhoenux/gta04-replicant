@@ -295,12 +295,21 @@ END
 				sed -i.bak 's/(info The correct version is: 1.6 or 1.7.)/(info The correct version is: 1.6 or 1.7 or 1.8 or 1.9.)/g' build/core/main.mk
 				fgrep 'javac_version := ' build/core/main.mk
 
-				# define a gcc wrapper
-				GCC=/usr/bin/cc	# system llvm
-				GPP=/usr/bin/c++	# system llvm
-
-				GCC=/opt/local/bin/llvm-gcc-4.2	# gcc by macports
-				GPP=/opt/local/bin/llvm-g++-4.2	# gcc by macports
+				# define a gcc wrapper that seems to work
+				case 2 in
+					1 )	# llvm by Xcode
+						GCC=/usr/bin/cc
+						GPP=/usr/bin/c++
+						;;
+					2 )	# sudo port install llvm-gcc42
+						GCC=/opt/local/bin/llvm-gcc-4.2
+						GPP=/opt/local/bin/llvm-g++-4.2
+						;;
+					3 )	# sudo port install gcc46 (?)
+						GCC=/opt/local/bin/gcc	# gcc-mp-4.6
+						GPP=/opt/local/bin/g++
+						;;
+				esac
 
 				cat >out/host/darwin-x86/bin/gcc <<END
 # echo $GCC -I$VOLUME/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
