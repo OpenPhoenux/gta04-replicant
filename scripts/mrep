@@ -359,16 +359,16 @@ END
 	esac
 	echo HOSTCC: $(cat out/host/darwin-x86/bin/gcc)
 	# we need a find that understands -printf from MacPorts
-	if [ ! -x /opt/local/bin/gfind ]
-	then
-		echo "*** sudo port install coreutils findutils gsed gxargs ***"
-		# sudo port install coreutils findutils gsed gxargs
-	fi
-	ln -sf /opt/local/bin/gfind out/host/darwin-x86/bin/find
-	ln -sf /opt/local/bin/gstat out/host/darwin-x86/bin/stat
-	ln -sf /opt/local/bin/greadlink out/host/darwin-x86/bin/readlink
-	ln -sf /opt/local/bin/gsed out/host/darwin-x86/bin/sed
-	ln -sf /opt/local/bin/gxargs out/host/darwin-x86/bin/xargs
+	for tool in find stat readlink sed xargs
+	do
+		if [ ! -x /opt/local/bin/g$tool ]
+		then
+			echo "!!! missing /opt/local/bin/g$tool !!!"
+			echo "run 'sudo port install port install coreutils findutils gsed gxargs'"
+			exit 1
+		fi
+		ln -sf /opt/local/bin/g$tool out/host/darwin-x86/bin/$tool
+	done
 	ln -sf "$(which gnutar)" out/host/darwin-x86/bin/tar
 
 	if [ ! -r out/host/darwin-x86/bin/mkimage ]
