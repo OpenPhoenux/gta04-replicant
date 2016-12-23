@@ -364,6 +364,8 @@ END
 	esac
 	echo HOSTCC: $(cat out/host/darwin-x86/bin/gcc)
 	# we need a find that understands -printf from MacPorts
+if false
+then
 	for tool in find stat readlink sed xargs
 	do
 		if [ ! -x /opt/local/bin/g$tool ]
@@ -375,6 +377,10 @@ END
 		ln -sf /opt/local/bin/g$tool out/host/darwin-x86/bin/$tool
 	done
 	ln -sf "$(which gnutar)" out/host/darwin-x86/bin/tar
+else
+	# prefer all gnu tools from MacPorts
+	PATH=/opt/local/libexec/gnubin/:$PATH
+fi
 
 	if [ ! -r out/host/darwin-x86/bin/mkimage ]
 	then
