@@ -14,9 +14,9 @@
         <remove-project name="replicant/vendor_replicant.git" />
 
         <project path="kernel/goldelico/gta04" remote="goldelico" name="gta04-kernel.git" revision="work/lukas/android-4.10"/>
-        <project path="device/goldelico/gta04" remote="goldelico" name="gta04-replicant-device.git" revision="next"/>
+        <project path="device/goldelico/gta04" remote="goldelico" name="gta04-replicant-device.git" revision="replicant-4.22"/>
         <project path="vendor/replicant" remote="goldelico" name="gta04-replicant-vendor.git" revision="replicant-4.2"/>
         <project path="goldelico" remote="goldelico" name="gta04-replicant.git" revision="master">
-            <copyfile src="local_manifests/gta04-replicant-next.xml" dest=".repo/local_manifests/gta04.xml" />
+            <copyfile src="local_manifests/gta04-replicant-4.22.xml" dest=".repo/local_manifests/gta04.xml" />
         </project>
     </manifest>
