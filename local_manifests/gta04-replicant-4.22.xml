@@ -3,15 +3,15 @@
         <remote name="goldelico" fetch="https://github.com/goldelico/" />
 
         <!-- Remove unneeded samsung kernels, to save space and traffic -->
-        <remove-project name="replicant/kernel/samsung/aries" />
-        <remove-project name="replicant/kernel/samsung/crespo" />
-        <remove-project name="kernel_samsung_smdk4412.git" />
-        <remove-project name="replicant/kernel/samsung/tuna" />
-        <remove-project name="replicant/kernel/samsung/espresso10" />
+        <remove-project name="replicant/kernel_samsung_aries.git" />
+        <remove-project name="replicant/kernel_samsung_crespo.git" />
+        <remove-project name="replicant/kernel_samsung_smdk4412.git" />
+        <remove-project name="replicant/kernel_samsung_tuna.git" />
+        <remove-project name="replicant/kernel_samsung_espresso10.git" />
 
-        <remove-project name="replicant/kernel/goldelico/gta04" />
-        <remove-project name="replicant/device/goldelico/gta04" />
-        <remove-project name="vendor_replicant.git" />
+        <remove-project name="replicant/kernel_goldelico_gta04.git" />
+        <remove-project name="replicant/device_goldelico_gta04.git" />
+        <remove-project name="replicant/vendor_replicant.git" />
 
         <project path="kernel/goldelico/gta04" remote="goldelico" name="gta04-kernel.git" revision="work/lukas/android-4.10"/>
         <project path="device/goldelico/gta04" remote="goldelico" name="gta04-replicant-device.git" revision="replicant-4.22"/>
