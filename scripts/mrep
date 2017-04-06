@@ -24,6 +24,7 @@ function usage {
 	echo "  -o file:         name of output file"
 	echo "  -mail mail@host: notify by mail when started and when done"
 	echo "  -s:              repo sync everything and apply local patches"
+	echo "  -sf:             repo sync --force-sync everything and apply local patches"
 	echo "  -u:              repo sync (i.e. update) gta04 support"
 	echo "  -l:              switch to a local manifest"
 	echo "  -r:              switch to a published (remote) manifest"
@@ -139,7 +140,7 @@ do
 	case "$1" in
 	-v )
 		shift
-		VERSION=$1
+		VERSION="$1"
 		;;
 
 	-GSNV )
@@ -164,6 +165,19 @@ do
 		vendor/replicant/get-prebuilts
 		;;
 
+	-sf )	# sync force and apply all patches
+		echo "*** syncing replicant-$REPLICANT ***"
+		../tools/repo sync --force-sync || exit 1
+		vendor/replicant/get-prebuilts
+
+		( cd $THIS/patches/$REPLICANT && find . -name '*.patch' -print ) | while read PATCH
+			do
+			DIR=$(dirname "$PATCH")
+			echo "*** patching $PATCH in $DIR ***"
+			( cd $DIR && pwd && git am -3 $THIS/replicant/$REPLICANT/$PATCH ) || exit 1
+			done
+		;;
+
 	-s )	# sync and apply all patches
 		echo "*** syncing replicant-$REPLICANT ***"
 		../tools/repo sync || exit 1
@@ -177,12 +191,14 @@ do
 			done
 		;;
 
-# FIXME: require to specify the branch name $VERSION as -r parameter?
+# FIXME: should we require to specify the branch name $VERSION as -r parameter?
 # first sync should automatically fetch this manifest
 	-r )
 		echo "*** installing remote GTA04 manifest from branch $VERSION ***"
 		mkdir -p .repo/local_manifests
 		MANIFEST="http://git.goldelico.com/?p=gta04-replicant.git;a=blob_plain;f=local_manifests/gta04-replicant-$REPLICANT.xml;hb=refs/heads/$VERSION"
+# echo $VERSION
+# echo $MANIFEST
 		[ -x "$(which wget)" ] &&
 			wget -O - $MANIFEST > .repo/local_manifests/gta04.xml ||
 			curl $MANIFEST > .repo/local_manifests/gta04.xml
@@ -301,7 +317,7 @@ END
 				fgrep 'javac_version := ' build/core/main.mk
 
 				# define a gcc wrapper that seems to work
-				case 2 in
+				case 1 in
 					1 )	# llvm by Xcode
 						GCC=/usr/bin/cc
 						GPP=/usr/bin/c++
@@ -310,9 +326,9 @@ END
 						GCC=/opt/local/bin/llvm-gcc-4.2
 						GPP=/opt/local/bin/llvm-g++-4.2
 						;;
-					3 )	# sudo port install gcc46 (?)
-						GCC=/opt/local/bin/gcc	# gcc-mp-4.6
-						GPP=/opt/local/bin/g++
+					3 )	# sudo port install gcc4
+						GCC=/opt/local/bin/gcc-mp-4.6
+						GPP=/opt/local/bin/g++-mp-4.6
 						;;
 				esac
 
@@ -322,9 +338,9 @@ END
 $GCC -I$VOLUME/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
 END
 				cat >out/host/darwin-x86/bin/g++ <<END
-# echo $GPP -I$VOLUME/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
+# echo $GPP -I$VOLUME/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__ -stdlib=libc++ $HOSTCFLAGS \$@
 
-$GPP -I$VOLUME/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
+$GPP -I$VOLUME/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__ -stdlib=libc++ $HOSTCFLAGS \$@
 END
 				chmod +x out/host/darwin-x86/bin/gcc
 				chmod +x out/host/darwin-x86/bin/g++
