@@ -310,11 +310,28 @@ END
 		[ "$LOCAL_TOOLCHAIN" ] || HOSTCFLAGS="-D__ASSEMBLY__"
 		case "$(uname -r)" in
 			15.* )	# 10.11
-				fgrep 'javac_version := ' build/core/main.mk
+				# choose jdk1.7 installed from Oracle server
+				export JAVA_HOME=/Library/Java/JavaVirtualMachines/jdk1.7.0_80.jdk/Contents/Home
+				# export JAVA_HOME=/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home
+				if [ ! -x "$JAVA_HOME" ]
+				then
+					echo "*** JDK is missing at $JAVA_HOME ***"
+					exit
+				fi
+unset JAVA_HOME
+#				export PATH="$JAVA_HOME/bin:$PATH"
+				echo "*** JDK javac version $(javac -version 2>&1) ***"
+
 				sed -i.bak 's|mac_sdk_versions_supported := .*|mac_sdk_versions_supported :=  10.12 10.11 10.10 10.9 10.7 10.8|g' build/core/combo/HOST_darwin-x86.mk
+
+# if we install and use the right SDK we don't have to patch the javac version
+if false
+then
+				fgrep 'javac_version := ' build/core/main.mk
 				sed -i.bak 's/javac_version := .*/javac_version := $(shell javac -version 2>\&1 | head -n 1 | grep '\''[ "]1\\.[6789][\\. "$$]'\'')/g' build/core/main.mk &&
 				sed -i.bak 's/(info The correct version is: 1.6 or 1.7.)/(info The correct version is: 1.6 or 1.7 or 1.8 or 1.9.)/g' build/core/main.mk
 				fgrep 'javac_version := ' build/core/main.mk
+fi
 
 				# define a gcc wrapper that seems to work
 				case 1 in
