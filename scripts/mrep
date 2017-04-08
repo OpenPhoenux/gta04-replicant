@@ -266,6 +266,8 @@ fi
 
 source build/envsetup.sh
 
+ROOT="$VOLUME/replicant-$REPLICANT"
+
 if [ "$(uname)" == "Darwin" ]
 then
 	echo "*** preparing Darwin compilers ***"
@@ -285,8 +287,8 @@ then
 		# for Replicant-2.3 we need standard gcc (not llvm-gcc) and have to explicitly add libstdc++ to avoid some errors
 		# g++ compilation needs libstdc++; this will print a harmless warning for standard C (e.g. when building the kernel)
 		cat >out/host/darwin-x86/bin/gcc <<END
-# echo /usr/bin/gcc-4.2 -I$VOLUME/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $VOLUME/replicant-2.3/kernel/goldelico/gta04/include '-DACCESSPERMS=(S_IRWXU|S_IRWXG|S_IRWXO)' \$@ -lSystem -lstdc++
-/usr/bin/gcc-4.2 -I$VOLUME/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $VOLUME/replicant-2.3/kernel/goldelico/gta04/include '-DACCESSPERMS=(S_IRWXU|S_IRWXG|S_IRWXO)' \$@ -lSystem -lstdc++
+# echo /usr/bin/gcc-4.2 -I$ROOT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $VOLUME/replicant-2.3/kernel/goldelico/gta04/include '-DACCESSPERMS=(S_IRWXU|S_IRWXG|S_IRWXO)' \$@ -lSystem -lstdc++
+/usr/bin/gcc-4.2 -I$ROOT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $VOLUME/replicant-2.3/kernel/goldelico/gta04/include '-DACCESSPERMS=(S_IRWXU|S_IRWXG|S_IRWXO)' \$@ -lSystem -lstdc++
 END
 		chmod +x out/host/darwin-x86/bin/gcc
 		ln -sf gcc out/host/darwin-x86/bin/cc
@@ -299,7 +301,7 @@ END
 		# but only for a 3.0 kernel and not 3.12? So we can make it conditional on LOCAL_TOOLCHAIN
 		[ "$LOCAL_TOOLCHAIN" ] || HOSTCFLAGS="-D__ASSEMBLY__"
 		cat >out/host/darwin-x86/bin/gcc <<END
-/usr/bin/llvm-gcc-4.2 -I$VOLUME/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
+/usr/bin/llvm-gcc-4.2 -I$ROOT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
 END
 		chmod +x out/host/darwin-x86/bin/gcc
 		ln -sf gcc out/host/darwin-x86/bin/cc
@@ -351,33 +353,33 @@ fi
 				esac
 
 				cat >out/host/darwin-x86/bin/gcc <<END
-# echo $GCC -I$VOLUME/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
+# echo $GCC -I$ROOT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
 
-$GCC -I$VOLUME/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
+$GCC -I$ROOT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
 END
 				cat >out/host/darwin-x86/bin/g++ <<END
-# echo $GPP -I$VOLUME/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__ -stdlib=libc++ $HOSTCFLAGS \$@
+# echo $GPP -I$ROOT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__ -stdlib=libc++ $HOSTCFLAGS \$@
 
-$GPP -I$VOLUME/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__ -stdlib=libc++ $HOSTCFLAGS \$@
+$GPP -I$ROOT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__ -stdlib=libc++ $HOSTCFLAGS \$@
 END
 				chmod +x out/host/darwin-x86/bin/gcc
 				chmod +x out/host/darwin-x86/bin/g++
 			;;
 			13.* )	# 10.9
 				cat >out/host/darwin-x86/bin/gcc <<END
-# echo /usr/bin/cc -I$VOLUME/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
-/usr/bin/cc -I$VOLUME/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
+# echo /usr/bin/cc -I$ROOT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
+/usr/bin/cc -I$ROOT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
 END
 				cat >out/host/darwin-x86/bin/g++ <<END
-# echo /usr/bin/c++ -I$VOLUME/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
-/usr/bin/c++ -I$VOLUME/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
+# echo /usr/bin/c++ -I$ROOT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
+/usr/bin/c++ -I$ROOT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
 END
 				chmod +x out/host/darwin-x86/bin/gcc
 				chmod +x out/host/darwin-x86/bin/g++
 			;;
 			10.* )	# 10.6.8
 				cat >out/host/darwin-x86/bin/gcc <<END
-/opt/local/bin/llvm-gcc-4.2 -I$VOLUME/replicant-$REPLICANT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
+/opt/local/bin/llvm-gcc-4.2 -I$ROOT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
 END
 				chmod +x out/host/darwin-x86/bin/gcc
 			;;
