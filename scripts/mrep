@@ -13,7 +13,7 @@
 [ "$LOCAL_TOOLCHAIN" ] || export LOCAL_TOOLCHAIN=""	# none specified - use built-in toolchain
 
 function usage {
-	echo "usage: mrep [ -R version ] [ -C ] { -v branch | -s | -u | -l | -r | -co | -c | -d | -o file | -mail mail@host } { -k | -b | -f | -n | -m action }"
+	echo "usage: mrep [ -R version ] [ -C ] { -v branch | -s | -u | -l | -r[suffix] | -co | -c | -d | -o file | -mail mail@host } { -k | -b | -f | -n | -m action }"
 	echo
 	echo "  before build (setup):"
 	echo "  -R version:      replicant version (known: 2.3, 4.0, 4.2, 6.0)"
@@ -27,10 +27,10 @@ function usage {
 	echo "  -sf:             repo sync --force-sync everything and apply local patches"
 	echo "  -u:              repo sync (i.e. update) gta04 support"
 	echo "  -l:              switch to a local manifest"
-	echo "  -r:              switch to a published (remote) manifest"
+	echo "  -r[suffix]:      switch to a published (remote) manifest (with optional suffix)"
 	echo "  -d:              enable debug (show commands)"
 	echo "  -GSNV:           set GIT_SSL_NO_VERIFY=true to ignore invalid https certificates"
-	echo "  default is none of these options"
+	echo "   default is none of these options"
 	echo
 	echo "  build commands:"
 	echo "  -k:              make kernel (only)"
@@ -193,15 +193,16 @@ do
 
 # FIXME: should we require to specify the branch name $VERSION as -r parameter?
 # first sync should automatically fetch this manifest
-	-r )
-		echo "*** installing remote GTA04 manifest from branch $VERSION ***"
+	-r* )
+		MANIFESTVERSION=$(expr "$1" : "-r\(.*\)")
+		echo "*** installing remote GTA04 manifest gta04-replicant-$REPLICANT$MANIFESTVERSION.xml from branch $VERSION ***"
 		mkdir -p .repo/local_manifests
-		MANIFEST="http://git.goldelico.com/?p=gta04-replicant.git;a=blob_plain;f=local_manifests/gta04-replicant-$REPLICANT.xml;hb=refs/heads/$VERSION"
+		MANIFEST="http://git.goldelico.com/?p=gta04-replicant.git;a=blob_plain;f=local_manifests/gta04-replicant-$REPLICANT$MANIFESTVERSION.xml;hb=refs/heads/$VERSION"
 # echo $VERSION
 # echo $MANIFEST
 		[ -x "$(which wget)" ] &&
-			wget -O - $MANIFEST > .repo/local_manifests/gta04.xml ||
-			curl $MANIFEST > .repo/local_manifests/gta04.xml
+			wget -O - "$MANIFEST" > .repo/local_manifests/gta04.xml ||
+			curl "$MANIFEST" > .repo/local_manifests/gta04.xml
 
 		rm -f .repo/local_manifests/local-dev.xml	# disable any localhost git
 		;;
