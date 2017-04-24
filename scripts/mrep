@@ -1,34 +1,37 @@
 #
-# build Replicant on MacOS X / Darwin
-#
-# tested and debugged on OS X 10.11.6 with Xcode 7.3.1 (llvm / clang 7.3.0) and jdk-8u101
+# build Replicant on Letux Cortex 8 connected to MacOS X through USB ethernet-gadget
 #
 
 [ "$REPLICANT" ] || export REPLICANT=4.2	# default
-[ "$VOLUME" ] || export VOLUME="/Volumes/CaseSensitive"
-[ "$DESTDIR" ] || export DESTDIR=/tmp
 [ "$REPO" ] || export 	REPO="https://storage.googleapis.com/git-repo-downloads/repo"
+[ "$REMOTE_MANIFEST" ] || export REMOTE_MANIFEST=https://code.fossencdi.org/replicant_manifest.git
 [ "$REMOTE_MANIFEST" ] || export REMOTE_MANIFEST=https://replicantmirror.fossencdi.org/replicant/manifest
 [ "$LOCAL_MANIFEST" ] || export LOCAL_MANIFEST="please specify"
-[ "$LOCAL_TOOLCHAIN" ] || export LOCAL_TOOLCHAIN=""	# none specified - use built-in toolchain
+
+DEVICE=root@192.168.2.106
+DEVICE=root@192.168.0.202
 
 function usage {
-	echo "usage: mrep [ -R version ] [ -C ] { -v branch | -s | -u | -l | -r[suffix] | -co | -c | -d | -o file | -mail mail@host } { -k | -b | -f | -n | -m action }"
+	echo "usage: mrep [ -eo] [ -R version ] [ -C ] { -v branch | -s | -u | -l | -r[suffix] | -co | -c | -d | -o file | -mail mail@host } { -k | -b | -f | -n | -m action }"
+	echo
+	echo "  on local host:"
+	echo "  -e:              choose root@192.168.2.106 for the Letux Cortex 8"
+	echo "  -o:              choose root@192.168.0.202 for the Letux Cortex 8 (default)"
+	echo "  -R version:      select replicant version (known: 2.3, 4.0, 4.2, 6.0)"
+	echo "  -o file:         name of output file"
 	echo
 	echo "  before build (setup):"
-	echo "  -R version:      replicant version (known: 2.3, 4.0, 4.2, 6.0)"
 	echo "  -C:              wipe out whole workspace to trigger fresh load (waits 10 seconds to abort)"
 	echo "  -co:             wipe out the 'out' directory"
 	echo "  -c:              force make clean before make"
 	echo "  -v branch:       checkout remote manifest from this branch"
-	echo "  -o file:         name of output file"
-	echo "  -mail mail@host: notify by mail when started and when done"
+	#echo "  -mail mail@host: notify by mail when started and when done"
 	echo "  -s:              repo sync everything and apply local patches"
 	echo "  -sf:             repo sync --force-sync everything and apply local patches"
 	echo "  -u:              repo sync (i.e. update) gta04 support"
-	echo "  -l:              switch to a local manifest"
+	#echo "  -l:              switch to a local manifest"
 	echo "  -r[suffix]:      switch to a published (remote) manifest (with optional suffix)"
-	echo "  -cc version:     choose host cc/c++ version"
+	#echo "  -cc version:     choose host cc/c++ version"
 	echo "  -d:              enable debug (show commands)"
 	echo "  -GSNV:           set GIT_SSL_NO_VERIFY=true to ignore invalid https certificates"
 	echo "   default is none of these options"
@@ -43,110 +46,100 @@ function usage {
 	echo "   2.3 default is -f -b"
 }
 
-if [ "$1" = "-R" ]
-then
+while [ "$1" ]
+do
+	case "$1" in
+		-e )	DEVICE=root@192.168.2.106;;
+		-o )	DEVICE=root@192.168.0.202;;
+		-R )
+			shift
+			REPLICANT="$1"
+			echo "*** selected Replicant $REPLICANT ***"
+			;;
+		-o )
+			shift;
+			OUTFILE="\$1"
+			;;
+		* ) 	break 2;;
+	esac
 	shift
-	REPLICANT="$1"
-	echo "*** selected Replicant $REPLICANT ***"
+done
+
+DIR=replicant-$REPLICANT
+TOOLS=replicant-tools
+OUTFILE=$(date "+%Y%m%d")-replicant.tbz
+VERSION=master
+
+ssh -o StrictHostKeyChecking=no $DEVICE bash -s -- "$@" <<END
+
+THIS="\$PWD"
+
+while [ "\$1" ]
+do
+	case "\$1" in
+		-C )
+			echo "*** Do you really want to wipe out the whole workspace (ctl-C to abort within the next 10 seconds)? ***"
+			sleep 10
+			echo "*** now wiping out ***"
+			rm -rf "$TOOLS" "$DIR"
+			ls -l "$TOOLS" "$DIR"
+			;;
+		* ) 	break 2;;
+	esac
 	shift
+done
+
+ls -l "$TOOLS/repo"
+if [ ! -x "$TOOLS/repo" ]
+then
+	echo "### Setup required build tools"
+
+	apt-get update && apt-get upgrade || exit
+	apt-get install -y gcc git wget ca-certificates python || exit
+
+	# check if JavaSDK is installed
+	# if not, redirect user to
+	#   download JavaSK jdk-8u131-linux-arm32-vfp-hflt.tar.gz from
+	#   http://www.oracle.com/technetwork/java/javase/downloads/jdk8-downloads-2133151.html
+	#   after accepting the license
+	#   and install
+	#   and restart mrep
+	#   exit
+
+	echo "### Setup the Source"
+
+	mkdir -p $TOOLS || exit 1
+	wget -O - http://commondatastorage.googleapis.com/git-repo-downloads/repo >$TOOLS/repo
+	chmod a+x $TOOLS/repo
 fi
 
-function init_server {
-	SERVER=$(expr "$DESTDIR" : '\(/Volumes/[^/]*/\).*')
-	# echo $DESTDIR $SERVER
-	[ "$SERVER" -a -x "$(dirname "$DESTDIR")" ] || {
-		if [ "$(hostname)" = "www.goldelico.private" ]
-		then
-			echo "*** running on server ***"
-			DESTDIR=/$(echo "$DESTDIR" | sed 's|/Volumes/[^/]*/||')
-		else
-			echo "*** server down - can't reach $SERVER to store resulting package ***"
-			mkdir -p "$SERVER"
-			echo "*** trying to mount //www.goldelico.com/Server%20HD as $SERVER ***"
-			if mount_smbfs "//$USER:$(cat ~/.ssh/www.goldelico.com)@www.goldelico.com/Server%20HD" "$SERVER"
-			then
-				echo "*** successfully mounted as $SERVER ***"
-			else
-				rmdir "$SERVER"
-				exit 1
-			fi
-		fi
-	}
-	echo "*** DESTDIR = $DESTDIR ***"
-	mkdir -p "$DESTDIR"
-}
 
-THIS=$PWD
-
-# protect against copying/storing ._ files
-export COPY_EXTENDED_ATTRIBUTES_DISABLED=true
-# for 10.5
-export COPYFILE_DISABLE=true
-# to compile on OS X 10.9 with SDK 10.9 we need to set this variable (even if we still have Xcode 3.2 installed)
-export BUILD_MAC_SDK_EXPERIMENTAL=1
-
-if ! cd "$VOLUME"
+if [ -r $DIR/build/envsetup.sh ]
 then
-	echo "please manually create a very large case sensitive working disk image (each replicant version eats 20-25 GB):"
-	if [ ! -r replicant.sparsebundle ]
-	then
-		echo "   hdiutil create -type SPARSEBUNDLE -fs 'Case-sensitive Journaled HFS+' -size 50g -volname $(basename $VOLUME) replicant.sparsebundle"
-	fi
-	echo "   open replicant.sparsebundle"
-	exit 1
-fi
+	echo "### Switch to Repo replicant-$REPLICANT ***"
+	cd "$DIR/" || exit 1
 
-if [ "$1" = "-C" ]
-then
-	shift
-	echo "*** Do you really want to wipe out the whole workspace (ctl-C to abort)? ***"
-	read X
-	echo "*** now wiping out ***"
-	rm -rf "./tools" "./replicant-$REPLICANT"
-# FIXME: can we force -s?
-fi
-
-if [ ! -x tools/repo ]
-then
-	echo "*** fetching the repo tool ***"
-	mkdir -p tools
-	[ -x "$(which wget)" ] &&
-		wget -O - $REPO > tools/repo ||
-		curl $REPO > tools/repo
-	chmod a+x tools/repo
-fi
-
-if [ -r replicant-$REPLICANT/build/envsetup.sh ]
-then
-	echo "*** switching to replicant-$REPLICANT ***"
-	cd replicant-$REPLICANT/
 else
-	echo "*** initializing $REMOTE_MANIFEST -b replicant-$REPLICANT ***"
-	mkdir -p replicant-$REPLICANT
-	cd replicant-$REPLICANT/
-	if ! ../tools/repo init -u "$REMOTE_MANIFEST" -b "replicant-$REPLICANT"
+	echo "### Initialize the Repo"
+	mkdir -p "$DIR" || exit 1
+	cd "$DIR/" || exit 1
+	if ! ../$TOOLS/repo init -u "$REMOTE_MANIFEST" -b "replicant-$REPLICANT"
 	then
-		echo "*** repo init failed ***"
-		echo "*** Do you want to wipe out the whole workspace (ctl-C to abort)? ***"
-		read X
-		rm -rf "./tools" "./replicant-$REPLICANT"
+		echo "*** repo init failed - run again with -C option ***"
+		exit 1
 	fi
+
 fi
 
 OUTFILE=rootfs.tar.bz2
 VERSION=master
 
-while true
+while [ "\$1" ]
 do
-	case "$1" in
-	-cc )
-		shift
-		CC="$1"
-		;;
-
+	case "\$1" in
 	-v )
 		shift
-		VERSION="$1"
+		VERSION="\$1"
 		;;
 
 	-GSNV )
@@ -167,50 +160,35 @@ do
 	-u )	# sync and apply local patches
 
 		echo "*** syncing replicant-$REPLICANT ***"
-		../tools/repo sync gta04-replicant.git gta04-replicant-device.git gta04-replicant-vendor.git gta04-kernel.git || exit 1
+		../$TOOLS/repo sync gta04-replicant.git gta04-replicant-device.git gta04-replicant-vendor.git gta04-kernel.git || exit 1
 		vendor/replicant/get-prebuilts
 		;;
 
 	-sf )	# sync force and apply all patches
 		echo "*** syncing replicant-$REPLICANT ***"
-		../tools/repo sync --force-sync || exit 1
+		../$TOOLS/repo sync --force-sync || exit 1
 		vendor/replicant/get-prebuilts
-
-		( cd $THIS/patches/$REPLICANT && find . -name '*.patch' -print ) | while read PATCH
-			do
-			DIR=$(dirname "$PATCH")
-			echo "*** patching $PATCH in $DIR ***"
-			( cd $DIR && pwd && git am -3 $THIS/replicant/$REPLICANT/$PATCH ) || exit 1
-			done
 		;;
 
 	-s )	# sync and apply all patches
+		### echo "### Download the Source + Extensions"
 		echo "*** syncing replicant-$REPLICANT ***"
-		../tools/repo sync || exit 1
+		../$TOOLS/repo sync || exit 1
 		vendor/replicant/get-prebuilts
-
-		( cd $THIS/patches/$REPLICANT && find . -name '*.patch' -print ) | while read PATCH
-			do
-			DIR=$(dirname "$PATCH")
-			echo "*** patching $PATCH in $DIR ***"
-			( cd $DIR && pwd && git am -3 $THIS/replicant/$REPLICANT/$PATCH ) || exit 1
-			done
 		;;
 
 # FIXME: should we require to specify the branch name $VERSION as -r parameter?
 # first sync should automatically fetch this manifest
 	-r* )
 		MV=$(expr "$1" : "-r\(.*\)")
-		[ "$MV" ] && MANIFESTVERSION="$MV"	# overwrite
+		[ "\$MV" ] && MANIFESTVERSION="\$MV"	# overwrite
+		### echo "### Setup the Goldelico extensions (Local Manifest)"
 		echo "*** installing remote GTA04 manifest gta04-replicant-$REPLICANT$MANIFESTVERSION.xml from branch $VERSION ***"
 		mkdir -p .repo/local_manifests
 		MANIFEST="http://git.goldelico.com/?p=gta04-replicant.git;a=blob_plain;f=local_manifests/gta04-replicant-$REPLICANT$MANIFESTVERSION.xml;hb=refs/heads/$VERSION"
 # echo $VERSION
 # echo $MANIFEST
-		[ -x "$(which wget)" ] &&
-			wget -O - "$MANIFEST" > .repo/local_manifests/gta04.xml ||
-			curl "$MANIFEST" > .repo/local_manifests/gta04.xml
-
+		wget -O - "\$MANIFEST" > .repo/local_manifests/gta04.xml
 		rm -f .repo/local_manifests/local-dev.xml	# disable any localhost git
 		;;
 
@@ -222,16 +200,6 @@ do
 
 		# name of local manifest must come after "gta04.xml" to be able to overwrite
 		cp $LOCAL_MANIFEST .repo/local_manifests/local-dev.xml	# enable localhost git
-		;;
-
-	-o )
-		shift;
-		OUTFILE="$1"
-		;;
-
-	-mail )
-		shift;
-		MAILTO="$1"
 		;;
 
 	-d )
@@ -248,357 +216,30 @@ do
 		;;
 
 	esac
-	shift;
-done
-
-if [ "$MAILTO" ]
-then
-	echo "*** sending mail notification to $MAILTO ***"
-	START=$(date)
-	(
-		echo started: $START
-		## include settings
-	) | mail -s "mrep on $(hostname) started" "$MAILTO"
-fi
-
-echo "*** envsetup ***"
-
-if (
-
-if [ ! -r build/envsetup.sh ]
-then
-	echo "*** envsetup.sh is missing - to resync run again with -s ***"
-	exit 1
-fi
-
-source build/envsetup.sh
-
-ROOT="$VOLUME/replicant-$REPLICANT"
-
-if [ "$(uname)" == "Darwin" ]
-then
-	echo "*** preparing Darwin compilers ***"
-	# this has been developed and tested on Mac OS X 10.6.8 (HOSTCC specific libraries and tools) with Xcode 3.2.6 (gcc/llvm-gcc-4.2)
-	if [ ! -r out/host/darwin-x86/include/elf.h ]
-	then
-		echo "*** getting elf.h ***"
-		mkdir -p out/host/darwin-x86/bin out/host/darwin-x86/include
-		curl 'http://sourceware.org/git/?p=glibc.git;a=blob_plain;f=elf/elf.h&hb=HEAD' > out/host/darwin-x86/include/elf.h
-		sed -i.bak 's|#include <features.h>|// #include <features.h>|g' out/host/darwin-x86/include/elf.h
-		sed -i.bak 's|__BEGIN_DECLS|// __BEGIN_DECLS|g' out/host/darwin-x86/include/elf.h
-		sed -i.bak 's|__END_DECLS|// __END_DECLS|g' out/host/darwin-x86/include/elf.h
-#		cp $THIS/replicant/$REPLICANT/elf.h out/host/darwin-x86/include/elf.h
-	fi
-	case "$REPLICANT" in
-	2.3 )
-		# for Replicant-2.3 we need standard gcc (not llvm-gcc) and have to explicitly add libstdc++ to avoid some errors
-		# g++ compilation needs libstdc++; this will print a harmless warning for standard C (e.g. when building the kernel)
-		cat >out/host/darwin-x86/bin/gcc <<END
-# echo /usr/bin/gcc-4.2 -I$ROOT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $VOLUME/replicant-2.3/kernel/goldelico/gta04/include '-DACCESSPERMS=(S_IRWXU|S_IRWXG|S_IRWXO)' \$@ -lSystem -lstdc++
-/usr/bin/gcc-4.2 -I$ROOT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $VOLUME/replicant-2.3/kernel/goldelico/gta04/include '-DACCESSPERMS=(S_IRWXU|S_IRWXG|S_IRWXO)' \$@ -lSystem -lstdc++
-END
-		chmod +x out/host/darwin-x86/bin/gcc
-		ln -sf gcc out/host/darwin-x86/bin/cc
-		ln -sf gcc out/host/darwin-x86/bin/g++
-		;;
-	4.0 )
-		# for Replicant-4.0 we need llvm-gcc or we will run into a compiler/assembler bug
-		# and we need to include some Linux header files to compile the tools
-		# and we have to -DASSEMBLY to avoid some conflicts with the file descriptor types
-		# but only for a 3.0 kernel and not 3.12? So we can make it conditional on LOCAL_TOOLCHAIN
-		[ "$LOCAL_TOOLCHAIN" ] || HOSTCFLAGS="-D__ASSEMBLY__"
-		cat >out/host/darwin-x86/bin/gcc <<END
-/usr/bin/llvm-gcc-4.2 -I$ROOT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
-END
-		chmod +x out/host/darwin-x86/bin/gcc
-		ln -sf gcc out/host/darwin-x86/bin/cc
-		;;
-	4.2 | 6.0 )
-		# for Replicant-4.2 we need llvm-gcc or we will run into a compiler/assembler bug
-		# and we need to include some Linux header files to compile the tools
-		# and we have to -DASSEMBLY to avoid some conflicts with the file descriptor types
-		[ "$LOCAL_TOOLCHAIN" ] || HOSTCFLAGS="-D__ASSEMBLY__"
-		case "$(uname -r)" in
-			15.* )	# 10.11
-				# choose jdk1.7 installed from Oracle server
-				export JAVA_HOME=/Library/Java/JavaVirtualMachines/jdk1.7.0_80.jdk/Contents/Home
-				# export JAVA_HOME=/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home
-				if [ ! -x "$JAVA_HOME" ]
-				then
-					echo "*** JDK is missing at $JAVA_HOME ***"
-					exit
-				fi
-unset JAVA_HOME
-#				export PATH="$JAVA_HOME/bin:$PATH"
-				echo "*** JDK javac version $(javac -version 2>&1) ***"
-
-				sed -i.bak 's|mac_sdk_versions_supported := .*|mac_sdk_versions_supported :=  10.12 10.11 10.10 10.9 10.7 10.8|g' build/core/combo/HOST_darwin-x86.mk
-
-# if we install and use the right SDK we don't have to patch the javac version
-if false
-then
-				fgrep 'javac_version := ' build/core/main.mk
-				sed -i.bak 's/javac_version := .*/javac_version := $(shell javac -version 2>\&1 | head -n 1 | grep '\''[ "]1\\.[6789][\\. "$$]'\'')/g' build/core/main.mk &&
-				sed -i.bak 's/(info The correct version is: 1.6 or 1.7.)/(info The correct version is: 1.6 or 1.7 or 1.8 or 1.9.)/g' build/core/main.mk
-				fgrep 'javac_version := ' build/core/main.mk
-fi
-
-				# define a gcc wrapper that seems to work
-				[ "$CC" ] || CC=3
-				case "$CC" in
-					1 )	# llvm by Xcode
-						echo "*** using -cc 1 = Host CC (LLVM by Xcode) ***"
-						GCC="/usr/bin/cc"
-						GPP="/usr/bin/c++"
-						HOSTCFLAGS+=""
-						HOSTCPPFLAGS+=" $HOSTCFLAGS -stdlib=libc++"
-						;;
-					2 )	# sudo port install llvm-gcc42
-						echo "*** using -cc 2 = llvm-gcc-4.2 by MacPorts ***"
-						GCC=/opt/local/bin/llvm-gcc-4.2
-						GPP=/opt/local/bin/llvm-g++-4.2
-						HOSTCFLAGS+=" -arch x86_64"
-						HOSTCPPFLAGS+=" $HOSTCFLAGS -std=c++0x"
-						;;
-					3 )	# sudo port install gcc4
-						# sudo port install gcc46 +universal
-						# sudo port install gcc46 is currently broken :(
-						echo "*** using -cc 3 = gcc-mp-4.6 by MacPorts ***"
-						GCC=/opt/local/bin/gcc-mp-4.6
-						GPP=/opt/local/bin/g++-mp-4.6
-						HOSTCFLAGS+=" -m64"
-						HOSTCPPFLAGS+=" $HOSTCFLAGS -std=c++0x"
-						;;
-					4 )	# sudo port install gcc49 +universal
-						echo "*** using -cc 4 = gcc-4.6.9 by MacPorts ***"
-						GCC=/opt/local/bin/gcc-mp-4.9
-						GPP=/opt/local/bin/g++-mp-4.9
-						HOSTCFLAGS+=" -m64"
-						HOSTCPPFLAGS+=" $HOSTCFLAGS -std=c++0x"
-						mkdir -p out/host/darwin-x86/obj/lib
-						;;
-					* )
-						echo "*** unknown -cc $CC ***"
-						exit
-						;;
-				esac
-
-				cat >out/host/darwin-x86/bin/gcc <<END
-# echo $GCC -I$ROOT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
-
-$GCC -I$ROOT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
-END
-				cat >out/host/darwin-x86/bin/g++ <<END
-# echo $GPP -I$ROOT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__ $HOSTCFLAGS \$@
-
-$GPP -I$ROOT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__ $HOSTCPPFLAGS \$@
-END
-				chmod +x out/host/darwin-x86/bin/gcc
-				chmod +x out/host/darwin-x86/bin/g++
-			;;
-			13.* )	# 10.9
-				cat >out/host/darwin-x86/bin/gcc <<END
-# echo /usr/bin/cc -I$ROOT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
-/usr/bin/cc -I$ROOT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
-END
-				cat >out/host/darwin-x86/bin/g++ <<END
-# echo /usr/bin/c++ -I$ROOT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
-/usr/bin/c++ -I$ROOT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__  $HOSTCFLAGS \$@
-END
-				chmod +x out/host/darwin-x86/bin/gcc
-				chmod +x out/host/darwin-x86/bin/g++
-			;;
-			10.* )	# 10.6.8
-				cat >out/host/darwin-x86/bin/gcc <<END
-/opt/local/bin/llvm-gcc-4.2 -I$ROOT/out/host/darwin-x86/include -idirafter /usr/include/sys -idirafter $PWD/kernel/goldelico/gta04/include -idirafter $PWD/kernel/goldelico/gta04/include/uapi -idirafter $PWD/kernel/goldelico/gta04/arch/x86/include/uapi -D__GNU_LIBRARY__ $HOSTCFLAGS \$@
-END
-				chmod +x out/host/darwin-x86/bin/gcc
-			;;
-			*)
-				echo unknown uname: $(uname -r)
-				exit 1
-				;;
-		esac
-		export LOADADDR=0x80008000
-		rm out/host/darwin-x86/bin/cc
-		rm out/host/darwin-x86/bin/c++
-		ln -sf gcc out/host/darwin-x86/bin/cc
-		ln -sf g++ out/host/darwin-x86/bin/c++
-		;;
-	* )
-		echo "*** don't know how to compile Replicant-$REPLICANT ***"
-		exit 1
-	esac
-	echo HOSTCC: $(cat out/host/darwin-x86/bin/gcc)
-	# we need a find that understands -printf from MacPorts
-if false
-then
-	for tool in find stat readlink sed xargs
-	do
-		if [ ! -x /opt/local/bin/g$tool ]
-		then
-			echo "!!! missing /opt/local/bin/g$tool !!!"
-			echo "run 'sudo port install coreutils findutils gsed gxargs'"
-			exit 1
-		fi
-		ln -sf /opt/local/bin/g$tool out/host/darwin-x86/bin/$tool
-	done
-	ln -sf "$(which gnutar)" out/host/darwin-x86/bin/tar
-else
-	# prefer all gnu tools from MacPorts
-	PATH=/opt/local/libexec/gnubin/:$PATH
-fi
-
-	if [ ! -r out/host/darwin-x86/bin/mkimage ]
-	then
-		curl http://download.goldelico.com/gta04/unstable/scripts/darwin/mkimage > out/host/darwin-x86/bin/mkimage
-		chmod a+x out/host/darwin-x86/bin/mkimage
-	fi
-	case "$(uname -r)" in
-		15.* )	# 10.11
-			# on 10.11 we use the Xcode 7 tools in /usr/bin through our script in out/host/darwin-x86/bin
-			PATH=$PWD/out/host/darwin-x86/bin:$PATH
-			;;
-		13.* )	# 10.9
-			# on 10.9 we use the Xcode 6 tools in /usr/bin through our script in out/host/darwin-x86/bin
-			PATH=$PWD/out/host/darwin-x86/bin:$PATH
-			;;
-		10.* ) # 10.6
-			# Replicant 4 works best with SDK 10.6 and Xcode 3.2
-			PATH=$PWD/out/host/darwin-x86/bin:/Xcode3.2/usr/bin:$PATH
-			;;
-		*)
-			echo unknown uname: $(uname -r)
-			exit 1
-			;;
-	esac
-	ls -l out/host/darwin-x86/bin/
-fi
-
-## fixme: move this to patches/4.2/frameworks/####.patch
-case "$REPLICANT" in
-4.2 )
-	echo "*** applying patches ***"
-
-	# bug in code makes clang report an error - fixed in Android 5.0
-	sed -i.bak "s|sizeof((header->version)) != 0))|sizeof(header->version)) != 0)|g" frameworks/compile/libbcc/lib/Renderscript/RSInfoReader.cpp
-esac
-
-echo "*** lunch replicant_gta04-eng ***"
-
-lunch replicant_gta04-eng
-export ANDROID_JAVA_HOME=$JAVA_HOME
-
-if [ ! "$1" ]
-then # set default commands
-	case "$REPLICANT" in
-		2.3 )
-			set -- -f -b
-			;;
-		4.* | 6.* )
-			set -- -f -k -n
-			;;
-	esac
-fi
-
-
-echo "*** run $COMMANDS ***"
-
-for i
-do
-	case "$i" in
-	-m )
-		shift
-		echo "*** make $@ ***"
-		make "$@" || exit 1
-		exit
-		;;
-
-	-f )
-		echo "*** -f make rootfs ***"
-
-		make bootimage BOARD_SDCARD_INIT:=true || exit 1
-		make $SHOWCOMMANDS systemtarball || exit 1
-
-		;;
-	-k )
-		echo "*** -k make kernel (only) ***"
-
-		# check if we have 'mkimage'
-		# make bootloaderimage	# we need mkimage before building the kernel
-
-		# patch kernel config not to use initramfs
-		sed -i.bak 's|CONFIG_INITRAMFS_SOURCE="../../root"|CONFIG_INITRAMFS_SOURCE=""|g' kernel/goldelico/gta04/arch/arm/configs/gta04_defconfig && rm kernel/goldelico/gta04/arch/arm/configs/gta04_defconfig.bak &&
-
-		make $SHOWCOMMANDS bootimage BOARD_SDCARD_INIT:=true || exit 1
-		init_server
-		echo "*** copy to $DESTDIR/unstable/kernel ***"
-		mkdir -p "$DESTDIR/unstable/"
-		cp out/target/product/gta04/kernel "$DESTDIR/unstable/kernel"
-		;;
-	-b )
-		init_server
-		echo "*** -b create single partition rootfs $DESTDIR/gta04-rootfs.tar.gz ***"
-
-		./goldelico/scripts/mkrootfs.sh || exit 1
-
-		init_server
-		echo "*** copy to $DESTDIR/unstable.tbz ***"
-		cp "out/target/product/gta04/gta04-rootfs.tar.bz2" "$DESTDIR/unstable-replicant.tbz"
-		chmod a+r "$DESTDIR/unstable-replicant.tbz"
-		;;
-	-n )
-		init_server
-		echo "*** -n copy to $DESTDIR/unstable/system.tar.bz2 ***"
-		mkdir -p "$DESTDIR/unstable/"
-		cp "out/target/product/gta04/system.tar.bz2" "$DESTDIR/unstable/system.tar.bz2" || exit 1
-		chmod a+r "$DESTDIR/unstable/system.tar.bz2"
-
-		echo "*** -n create $DESTDIR/unstable/$OUTFILE without initramdisk ***"
-		(
-		cd out/target/product/gta04 && 
-		rm -rf rootfs/boot rootfs/sbin/init &&
-		mkdir -p rootfs/boot &&
-		ln -s system/lib rootfs/lib &&
-		# make a flat file system
-		(cd root && tar cf - .) | (cd rootfs && tar xf -) &&
-		(tar cf - system recovery kernel) | (cd rootfs && tar xf -) &&
-		sed -i.bak 's|mount |#mount |g' rootfs/init.rc && rm rootfs/init.rc.bak &&
-		sed -i.bak 's|mount |#mount |g' rootfs/init.gta04.rc && rm rootfs/init.gta04.rc.bak &&
-		sed -i.bak 's|on fs|#on fs|g' rootfs/init.rc && rm rootfs/init.rc.bak && # /init segfaults if there are no commands in 'on fs'
-		sed -i.bak 's|on fs|#on fs|g' rootfs/init.gta04.rc && rm rootfs/init.gta04.rc.bak && # /init segfaults if there are no commands in 'on fs'
-		ln -sf ../kernel rootfs/boot/uImage &&
-		ln -sf ../init rootfs/sbin/init &&
-		tar cjvf rootfs.tar.bz2 --exclude .DS_Store -C rootfs .
-		) &&
-		cp "out/target/product/gta04/rootfs.tar.bz2" "$DESTDIR/unstable/$OUTFILE"
-		chmod a+r "$DESTDIR/unstable/$OUTFILE"
-		;;
-	* )
-		echo "*** unknown command $i ignored ***"
-		usage
-		exit 1
-		;;
-	esac
 	shift
 done
 
-)
-then STATUS=finished
-else STATUS=failed
-fi
+echo "### Build Replicant/Android"
 
-if [ "$MAILTO" ]
-then
-	# send notification mail about success
-	(
-		echo started: $START
-		ls -l . out/target/product/gta04
-		echo $STATUS: $(date)
-	) | mail -s "mrep on $(hostname) $STATUS" "$MAILTO"
-fi
+source build/envsetup.sh
+lunch replicant_gta04-eng
+export ANDROID_JAVA_HOME=\$JAVA_HOME
+LOADADDR=0x80008000 make -j4 bootimage
+make -j4 systemtarball
 
-echo "*** result ***"
+ls -l out/target/product/gta04/kernel out/target/product/gta04/system.tar.bz2 out/target/product/gta04/root/
 
-init_server
-ls -l "$DESTDIR"
+echo "### Create single partion system image for GTA04"
+
+goldelico/scripts/mkrootfs.sh
+
+ls -l out/target/product/gta04/gta04-rootfs.tar.bz2
+
+END
+
+# pull out/target/product/gta04/gta04-rootfs.tar.bz2 and upload to server
+
+ssh -o StrictHostKeyChecking=no $DEVICE sh -c "; cat $DIR/out/target/product/gta04/gta04-rootfs.tar.bz2" >./$OUTFILE
+
+# rsync to server using $REPLICANT prefix
+
