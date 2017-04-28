@@ -65,12 +65,17 @@ do
 	shift
 done
 
-DIR=replicant-$REPLICANT
-TOOLS=replicant-tools
+JAVA_HOME=/usr/local/jdk
+DIR=/replicant-$REPLICANT
+TOOLS=/replicant-tools
 OUTFILE=$(date "+%Y%m%d")-replicant.tbz
 VERSION=master
 
-ssh -o StrictHostKeyChecking=no $DEVICE bash -s -- "$@" <<END
+ssh -o StrictHostKeyChecking=no $DEVICE bash -s -- "$@" <<END || exit 1
+
+# export GIT_TRACE=/git.log
+
+echo "### ssh $DEVICE up and running"
 
 THIS="\$PWD"
 
@@ -89,22 +94,28 @@ do
 	shift
 done
 
+if [ ! -d "$JAVA_HOME" ]
+then
+	echo "### no JDK installed"
+	echo "  download jdk-8u*1-linux-arm32-vfp-hflt.tar.gz from"
+	echo "  http://www.oracle.com/technetwork/java/javase/downloads/jdk8-downloads-2133151.html"
+	echo "  after accepting the license"
+	echo "then"
+	echo "  JDK=location of the jdk-8u*1-linux-arm32-vfp-hflt.tar.gz"
+	echo "  cd /usr/local"
+	echo '  tar xvzf \\$JDK'
+	echo "  ln -s /usr/local/jdk1.8.0_131 /usr/local/jdk"
+	echo "then restart mrep"
+	exit 1
+fi
+
 ls -l "$TOOLS/repo"
 if [ ! -x "$TOOLS/repo" ]
 then
 	echo "### Setup required build tools"
 
-	apt-get update && apt-get upgrade || exit
-	apt-get install -y gcc git wget ca-certificates python || exit
-
-	# check if JavaSDK is installed
-	# if not, redirect user to
-	#   download JavaSK jdk-8u131-linux-arm32-vfp-hflt.tar.gz from
-	#   http://www.oracle.com/technetwork/java/javase/downloads/jdk8-downloads-2133151.html
-	#   after accepting the license
-	#   and install
-	#   and restart mrep
-	#   exit
+	apt-get update && apt-get upgrade || exit 1
+	apt-get install -y gcc git wget rsync ca-certificates python || exit 1
 
 	echo "### Setup the Source"
 
@@ -114,7 +125,7 @@ then
 fi
 
 
-if [ -r $DIR/build/envsetup.sh ]
+if [ -r $DIR/build/envsetup.sh -o "$1" = "-s" -o "$1" = "-sf" ]
 then
 	echo "### Switch to Repo replicant-$REPLICANT ***"
 	cd "$DIR/" || exit 1
@@ -128,7 +139,7 @@ else
 		echo "*** repo init failed - run again with -C option ***"
 		exit 1
 	fi
-
+	set -- -s "$@"	# force repo sync
 fi
 
 OUTFILE=rootfs.tar.bz2
@@ -208,7 +219,7 @@ do
 
 	"-?" )
 		usage
-		exit
+		exit 1
 		;;
 
 	* )
@@ -240,6 +251,8 @@ END
 # pull out/target/product/gta04/gta04-rootfs.tar.bz2 and upload to server
 
 ssh -o StrictHostKeyChecking=no $DEVICE sh -c "; cat $DIR/out/target/product/gta04/gta04-rootfs.tar.bz2" >./$OUTFILE
+
+ls -l ./$OUTFILE
 
 # rsync to server using $REPLICANT prefix
 
