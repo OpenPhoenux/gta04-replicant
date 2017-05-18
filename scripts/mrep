@@ -11,6 +11,9 @@
 DEVICE=root@192.168.2.106
 DEVICE=root@192.168.0.202
 
+# NOTE: this is specific to Debian!
+BUILD_TOOLS="gcc g++ bison default-jre xsltproc git wget curl rsync ca-certificates python"
+
 function usage {
 	echo "usage: mrep [ -eo] [ -R version ] [ -C ] { -v branch | -s | -u | -l | -r[suffix] | -co | -c | -d | -o file | -mail mail@host } { -k | -b | -f | -n | -m action }"
 	echo
@@ -71,6 +74,9 @@ TOOLS=/replicant-tools
 OUTFILE=$(date "+%Y%m%d")-replicant.tbz
 VERSION=master
 
+# variables set inside the remote shell must be accessed through \$
+# because the HERE-document expands $var
+
 ssh -o StrictHostKeyChecking=no $DEVICE bash -s -- "$@" <<END || exit 1
 
 # export GIT_TRACE=/git.log
@@ -94,6 +100,8 @@ do
 	shift
 done
 
+# can we/we can use default-jdk
+
 if [ ! -d "$JAVA_HOME" ]
 then
 	echo "### no JDK installed"
@@ -115,7 +123,7 @@ then
 	echo "### Setup required build tools"
 
 	apt-get update && apt-get upgrade || exit 1
-	apt-get install -y gcc git wget rsync ca-certificates python || exit 1
+	apt-get install -y $BUILD_TOOLS || exit 1
 
 	echo "### Setup the Source"
 
@@ -125,7 +133,7 @@ then
 fi
 
 
-if [ -r $DIR/build/envsetup.sh -o "$1" = "-s" -o "$1" = "-sf" ]
+if [ -r $DIR/build/envsetup.sh -o "$1" = "-s" -o "$1" = "-sf" -o "$1" = "-sb" ]
 then
 	echo "### Switch to Repo replicant-$REPLICANT ***"
 	cd "$DIR/" || exit 1
@@ -181,6 +189,12 @@ do
 		vendor/replicant/get-prebuilts
 		;;
 
+	-sb )	# sync broken and apply all patches
+		echo "*** syncing replicant-$REPLICANT ***"
+		../$TOOLS/repo sync -j 1 --force-broken || exit 1
+		vendor/replicant/get-prebuilts
+		;;
+
 	-s )	# sync and apply all patches
 		### echo "### Download the Source + Extensions"
 		echo "*** syncing replicant-$REPLICANT ***"
@@ -232,9 +246,19 @@ done
 
 echo "### Build Replicant/Android"
 
+# pass from driver script to remote ssh shell
+export JAVA_HOME=\$(readlink -f /usr/bin/java | sed "s:bin/java::")
+export ANDROID_JAVA_HOME=\$JAVA_HOME
+#echo A:$JAVA_HOME B:\$JAVA_HOME
+#echo A:$ANDROID_JAVA_HOME B:\$ANDROID_JAVA_HOME
+
+# help host detection since uname -sm fails
+cp build/core/combo/HOST_linux-x86.mk build/core/combo/HOST_linux-arm.mk
+export HOST_ARCH=arm
+
 source build/envsetup.sh
 lunch replicant_gta04-eng
-export ANDROID_JAVA_HOME=\$JAVA_HOME
+
 LOADADDR=0x80008000 make -j4 bootimage
 make -j4 systemtarball
 
