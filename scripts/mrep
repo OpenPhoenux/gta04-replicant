@@ -15,11 +15,12 @@ DEVICE=root@192.168.0.202
 BUILD_TOOLS="gcc g++ bison default-jre xsltproc git wget curl rsync ca-certificates python"
 
 function usage {
-	echo "usage: mrep [ -eo] [ -R version ] [ -C ] { -v branch | -s | -u | -l | -r[suffix] | -co | -c | -d | -o file | -mail mail@host } { -k | -b | -f | -n | -m action }"
+	echo "usage: mrep [ -e ] [ -o ] [ -vb ] [ -R version ] [ -C ] { -v branch | -s | -u | -l | -r[suffix] | -co | -c | -d | -o file | -mail mail@host } { -k | -b | -f | -n | -m action }"
 	echo
 	echo "  on local host:"
 	echo "  -e:              choose root@192.168.2.106 for the Letux Cortex 8"
 	echo "  -o:              choose root@192.168.0.202 for the Letux Cortex 8 (default)"
+	echo "  -vb:             choose -p 3022 root@localhost for a virtual box"
 	echo "  -R version:      select replicant version (known: 2.3, 4.0, 4.2, 6.0)"
 	echo "  -o file:         name of output file"
 	echo
@@ -54,6 +55,7 @@ do
 	case "$1" in
 		-e )	DEVICE=root@192.168.2.106;;
 		-o )	DEVICE=root@192.168.0.202;;
+		-vb )	DEVICE="-p 3022 root@localhost";;
 		-R )
 			shift
 			REPLICANT="$1"
@@ -117,10 +119,9 @@ then
 	exit 1
 fi
 
-ls -l "$TOOLS/repo"
 if [ ! -x "$TOOLS/repo" ]
 then
-	echo "### Setup required build tools"
+	echo "### Setup required build tools in $TOOLS"
 
 	apt-get update && apt-get upgrade || exit 1
 	apt-get install -y $BUILD_TOOLS || exit 1
@@ -131,7 +132,7 @@ then
 	wget -O - http://commondatastorage.googleapis.com/git-repo-downloads/repo >$TOOLS/repo
 	chmod a+x $TOOLS/repo
 fi
-
+ls -l "$TOOLS/repo"
 
 if [ -r $DIR/build/envsetup.sh -o "$1" = "-s" -o "$1" = "-sf" -o "$1" = "-sb" ]
 then
