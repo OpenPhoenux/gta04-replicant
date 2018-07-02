@@ -13,8 +13,8 @@
         <remove-project name="replicant/device_goldelico_gta04.git" />
         <remove-project name="vendor_replicant.git" />
 
-        <project path="kernel/goldelico/gta04" remote="goldelico" name="gta04-kernel.git" revision="work/lukas/android-4.10"/>
-        <project path="device/goldelico/gta04" remote="goldelico" name="gta04-replicant-device.git" revision="replicant-4.2-v2"/>
+        <project path="kernel/goldelico/gta04" remote="goldelico" name="letux-kernel.git" revision="work/lukas/android-4.10"/>
+        <project path="device/goldelico/gta04" remote="goldelico" name="letux-replicant-device.git" revision="replicant-4.2-v2"/>
         <project path="vendor/replicant" remote="goldelico" name="gta04-replicant-vendor.git" revision="replicant-4.2"/>
         <project path="goldelico" remote="goldelico" name="gta04-replicant.git" revision="master">
             <copyfile src="local_manifests/gta04-replicant-4.2-v2.xml" dest=".repo/local_manifests/gta04.xml" />
