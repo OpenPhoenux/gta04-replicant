@@ -1,6 +1,12 @@
 #!/bin/bash
+
+# if $OUT has been set by the build-system, we know the path. Otherwise guess
+if [ -z "$OUT" ]; then
+	OUT="$PWD/out/target/product/gta04"
+fi
+
 echo "*** preparing GTA04 rootfs ***"
-cd out/target/product/gta04/ || exit 1
+cd "$OUT" || exit 1
 mkdir -p rootfs/boot
 
 echo "*** copying system ***"
@@ -39,4 +45,4 @@ tar cjvf ../gta04-rootfs.tar.bz2 .
 echo "*** cleaning up GTA04 rootfs ***"
 rm -rf rootfs/
 echo "Result is here:"
-echo "out/target/product/gta04/gta04-rootfs.tar.bz2"
+echo "$OUT/gta04-rootfs.tar.bz2"
