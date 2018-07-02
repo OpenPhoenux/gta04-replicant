@@ -8,6 +8,14 @@
         <remove-project name="replicant/vendor_replicant.git" />
         -->
 
+        <!-- override toybox -->
+        <remove-project name="LineageOS-mirror/android_external_toybox.git" />
+        <project path="external/toybox" name="letux-replicant-toybox-external.git" remote="goldelico" revision="replicant-6.0-letux" />
+
+        <!-- override build -->
+        <remove-project name="replicant/build.git" />
+        <project path="build" name="letux-replicant-build-platform.git" remote="goldelico" revision="replicant-6.0-letux" />
+
         <project path="kernel/goldelico/gta04" remote="goldelico" name="letux-kernel.git" revision="work/josua/android-4.17"/>
         <project path="device/goldelico/gta04" remote="goldelico" name="letux-replicant-device.git" revision="replicant-6.0"/>
         <!--<project path="vendor/replicant" remote="goldelico" name="gta04-replicant-vendor.git" revision="replicant-6.0"/>-->
